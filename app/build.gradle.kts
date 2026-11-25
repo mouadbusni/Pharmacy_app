@@ -9,6 +9,7 @@ plugins {
 }
 
 val ciBuildNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()?.coerceAtLeast(1) ?: 1
+val appDistributionEnabled = System.getenv("FIREBASE_APP_DISTRIBUTION_ENABLED")?.equals("true", ignoreCase = true) == true
 
 android {
   namespace = "com.example"
@@ -22,6 +23,7 @@ android {
     // The first CI/local build starts at 2, above the original repository versionCode 1.
     versionCode = 1 + ciBuildNumber
     versionName = "1.0.$ciBuildNumber"
+    buildConfigField("boolean", "FIREBASE_APP_DISTRIBUTION_ENABLED", appDistributionEnabled.toString())
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
