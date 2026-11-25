@@ -8,7 +8,7 @@ This repository's CI pipeline is in `.github/workflows/firebase-app-distribution
 - GitHub Actions uses Gradle 9.3.1 and JDK 17, runs JVM unit tests, and builds a signed APK.
 - The build's `versionCode` increments automatically using the GitHub Actions run number. The first CI APK is versionCode 2, above the original repository value of 1.
 - The APK is saved as a GitHub Actions artifact and distributed to the selected Firebase App Distribution testers/groups.
-- The app includes the Firebase App Distribution Android SDK. When a tester opens or resumes the app, it checks for a new release and displays Firebase's update flow.
+- The app includes the Firebase App Distribution Android SDK. CI-distributed APKs enable the update check; ordinary local/production builds leave it disabled. When a signed-in tester opens or resumes a distributed build, it checks for a new release and displays Firebase's update flow.
 
 Firebase App Distribution does **not** silently install APKs. Android requires the user to approve installation. Testers receive release notifications, and the in-app update prompt can be enabled by signing into App Distribution in the app.
 
