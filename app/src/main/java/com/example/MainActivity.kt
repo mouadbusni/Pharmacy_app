@@ -106,6 +106,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        if (!BuildConfig.FIREBASE_APP_DISTRIBUTION_ENABLED) return
+
         // Firebase App Distribution shows an update prompt to signed-in testers
         // when a newer APK has been distributed to their tester account.
         runCatching {
