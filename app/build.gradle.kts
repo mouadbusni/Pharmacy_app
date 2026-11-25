@@ -8,6 +8,8 @@ plugins {
   alias(libs.plugins.google.services)
 }
 
+val ciBuildNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()?.coerceAtLeast(1) ?: 1
+
 android {
   namespace = "com.example"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
@@ -16,8 +18,10 @@ android {
     applicationId = "com.aistudio.arabicpharmacy.qrxmzk"
     minSdk = 24
     targetSdk = 36
-    versionCode = 1
-    versionName = "1.0"
+    // Keep CI APKs upgradeable: every GitHub Actions run gets a higher versionCode.
+    // The first CI/local build starts at 2, above the original repository versionCode 1.
+    versionCode = 1 + ciBuildNumber
+    versionName = "1.0.$ciBuildNumber"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -33,7 +37,8 @@ android {
       keyPassword = System.getenv("KEY_PASSWORD")
     }
     create("debugConfig") {
-      storeFile = file("${rootDir}/debug.keystore")
+      val debugKeystorePath = System.getenv("DEBUG_KEYSTORE_PATH") ?: "${rootDir}/debug.keystore"
+      storeFile = file(debugKeystorePath)
       storePassword = "android"
       keyAlias = "androiddebugkey"
       keyPassword = "android"
