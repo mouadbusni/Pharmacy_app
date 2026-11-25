@@ -112,7 +112,14 @@ jobs:
         env:
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: gradle :app:testDebugUnitTest --no-daemon
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$ANDROID_BUILD_TYPE" == "debug" ]]; then
+            gradle :app:testDebugUnitTest --no-daemon
+          else
+            gradle :app:testReleaseUnitTest --no-daemon
+          fi
 
       - name: Build signed APK
         env:
