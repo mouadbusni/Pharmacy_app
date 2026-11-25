@@ -116,6 +116,7 @@ dependencies {
   implementation(libs.firebase.firestore)
 
   implementation(libs.firebase.auth)
+  implementation(libs.firebase.appdistribution)
   implementation(libs.androidx.credentials)
   implementation(libs.androidx.credentials.play.services)
   implementation(libs.googleid)
