@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -22,6 +23,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -35,6 +37,7 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -44,7 +47,7 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -57,48 +60,61 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.catalog.PharmacyCatalog
 import com.example.data.model.CartItem
 import com.example.ui.components.BackCircleButton
+import com.example.ui.components.ErrorStateCard
 import com.example.ui.components.HeaderCircleIconButton
+import com.example.ui.components.LoadingStateCard
 import com.example.ui.components.ProductPackageArt
 import com.example.ui.theme.BorderSubtle
 import com.example.ui.theme.ForestGreen
+import com.example.ui.theme.LocalAppStrings
 import com.example.ui.theme.MintSoft
 import com.example.ui.theme.MintTeal
 import com.example.ui.theme.NeutralBackground
 import com.example.ui.theme.PureWhite
+import com.example.ui.theme.StatusClosedBg
 import com.example.ui.theme.StatusClosedRed
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 import com.example.ui.theme.WarmGold
+import com.example.viewmodel.UiState
 
 @Composable
 fun CartScreen(
-    cartItems: List<CartItem>,
+    cartState: UiState<List<CartItem>>,
     onBack: () -> Unit,
     onUpdateQty: (String, Int) -> Unit,
     onRemoveItem: (String) -> Unit,
     onProceedCheckout: () -> Unit,
     onBrowseProducts: () -> Unit,
+    onRetry: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val strings = LocalAppStrings.current
+    val cartItems = (cartState as? UiState.Success)?.data ?: emptyList()
     val subtotal = cartItems.sumOf { it.priceUsd * it.quantity }
-    val deliveryFee = if (cartItems.isEmpty()) 0.0 else 5.0
+    val deliveryFee = if (cartItems.isEmpty()) 0.0 else PharmacyCatalog.DELIVERY_FEE_MAD
     val total = subtotal + deliveryFee
 
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .background(PureWhite),
         contentAlignment = Alignment.TopCenter
     ) {
+        val isWide = maxWidth >= 600.dp
+        val maxContentWidth = if (isWide) 900.dp else 600.dp
+
         Column(
             modifier = Modifier
-                .widthIn(max = 600.dp)
+                .widthIn(max = maxContentWidth)
                 .fillMaxSize()
         ) {
             Row(
@@ -111,13 +127,13 @@ fun CartScreen(
             ) {
                 BackCircleButton(onClick = onBack)
                 Text(
-                    text = "السلة",
+                    text = strings.cartTitle,
                     style = MaterialTheme.typography.headlineSmall,
                     color = TextPrimary
                 )
                 HeaderCircleIconButton(
                     onClick = {},
-                    contentDescription = "عدد المنتجات",
+                    contentDescription = strings.itemCountDesc,
                     badgeCount = cartItems.sumOf { it.quantity }.toInt()
                 ) {
                     Icon(
@@ -129,238 +145,371 @@ fun CartScreen(
                 }
             }
 
-            if (cartItems.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .padding(32.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Surface(
-                            shape = CircleShape,
-                            color = MintSoft,
-                            modifier = Modifier.size(84.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Filled.ShoppingBag,
-                                    contentDescription = null,
-                                    tint = ForestGreen,
-                                    modifier = Modifier.size(38.dp)
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = "سلة التسوق فارغة",
-                            style = MaterialTheme.typography.titleLarge,
-                            color = TextPrimary
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = "تصفح الأدوية والفيتامينات وأضف احتياجاتك للتوصيل خلال 30 دقيقة.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = TextSecondary,
-                            textAlign = TextAlign.Center
-                        )
-                        Spacer(modifier = Modifier.height(20.dp))
-                        Button(
-                            onClick = onBrowseProducts,
-                            shape = RoundedCornerShape(16.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = ForestGreen)
-                        ) {
-                            Text("تصفح المنتجات", color = PureWhite)
-                        }
+            when (cartState) {
+                UiState.Loading -> {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        LoadingStateCard()
                     }
                 }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(cartItems, key = { it.productId.ifBlank { it.id } }) { item ->
-                        val catalogProd = remember(item.productId) {
-                            PharmacyCatalog.products.firstOrNull { it.id == item.productId }
-                                ?: PharmacyCatalog.products.first()
-                        }
-                        val docId = item.id.ifBlank { item.productId }
-
-                        Surface(
-                            shape = RoundedCornerShape(20.dp),
-                            color = PureWhite,
-                            shadowElevation = 2.dp,
-                            border = BorderStroke(1.dp, BorderSubtle),
-                            modifier = Modifier.fillMaxWidth()
+                is UiState.Error -> {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        ErrorStateCard(
+                            errorMessage = cartState.message,
+                            onRetry = onRetry
+                        )
+                    }
+                }
+                is UiState.Success -> {
+                    if (cartItems.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                                .padding(32.dp),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.weight(1f)
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = MintSoft,
+                                    modifier = Modifier.size(84.dp)
                                 ) {
-                                    ProductPackageArt(
-                                        product = catalogProd,
-                                        modifier = Modifier.size(72.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Column {
-                                        Text(
-                                            text = item.productName,
-                                            style = MaterialTheme.typography.titleMedium,
-                                            color = TextPrimary
-                                        )
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(
-                                                imageVector = Icons.Filled.Star,
-                                                contentDescription = null,
-                                                tint = WarmGold,
-                                                modifier = Modifier.size(14.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(3.dp))
-                                            Text(
-                                                text = item.rating.toString(),
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = TextSecondary
-                                            )
-                                        }
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text(
-                                            text = "${(item.priceUsd * item.quantity).toInt()}$",
-                                            style = MaterialTheme.typography.titleMedium,
-                                            color = TextPrimary,
-                                            fontWeight = FontWeight.Bold
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = Icons.Filled.ShoppingBag,
+                                            contentDescription = null,
+                                            tint = ForestGreen,
+                                            modifier = Modifier.size(38.dp)
                                         )
                                     }
                                 }
-
-                                Column(
-                                    horizontalAlignment = Alignment.End,
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    text = strings.emptyCartTitle,
+                                    style = MaterialTheme.typography.titleLarge,
+                                    color = TextPrimary,
+                                    textAlign = TextAlign.Center
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = strings.emptyCartBody,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = TextSecondary,
+                                    textAlign = TextAlign.Center
+                                )
+                                Spacer(modifier = Modifier.height(20.dp))
+                                Button(
+                                    onClick = onBrowseProducts,
+                                    shape = RoundedCornerShape(16.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = ForestGreen)
                                 ) {
-                                    IconButton(
-                                        onClick = { onRemoveItem(docId) },
-                                        modifier = Modifier.size(32.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Filled.DeleteOutline,
-                                            contentDescription = "حذف",
-                                            tint = StatusClosedRed,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                    }
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                    ) {
-                                        Surface(
-                                            onClick = {
-                                                onUpdateQty(docId, (item.quantity + 1).toInt())
-                                            },
-                                            shape = CircleShape,
-                                            color = ForestGreen,
-                                            modifier = Modifier.size(30.dp)
-                                        ) {
-                                            Box(contentAlignment = Alignment.Center) {
-                                                Icon(
-                                                    imageVector = Icons.Filled.Add,
-                                                    contentDescription = "زيادة",
-                                                    tint = PureWhite,
-                                                    modifier = Modifier.size(15.dp)
-                                                )
-                                            }
-                                        }
-                                        Text(
-                                            text = item.quantity.toString(),
-                                            style = MaterialTheme.typography.titleSmall,
-                                            color = TextPrimary
-                                        )
-                                        Surface(
-                                            onClick = {
-                                                onUpdateQty(docId, (item.quantity - 1).toInt())
-                                            },
-                                            shape = CircleShape,
-                                            color = NeutralBackground,
-                                            border = BorderStroke(1.dp, BorderSubtle),
-                                            modifier = Modifier.size(30.dp)
-                                        ) {
-                                            Box(contentAlignment = Alignment.Center) {
-                                                Icon(
-                                                    imageVector = Icons.Filled.Remove,
-                                                    contentDescription = "إنقاص",
-                                                    tint = ForestGreen,
-                                                    modifier = Modifier.size(15.dp)
-                                                )
-                                            }
-                                        }
-                                    }
+                                    Text(strings.browseProducts, color = PureWhite)
                                 }
                             }
                         }
-                    }
-
-                    item {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Surface(
-                            shape = RoundedCornerShape(20.dp),
-                            color = NeutralBackground,
-                            border = BorderStroke(1.dp, BorderSubtle),
-                            modifier = Modifier.fillMaxWidth()
+                    } else if (isWide) {
+                        Row(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                                .padding(horizontal = 18.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(20.dp)
                         ) {
-                            Column(
-                                modifier = Modifier.padding(18.dp),
-                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            LazyColumn(
+                                modifier = Modifier.weight(1.35f),
+                                contentPadding = PaddingValues(bottom = 24.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                SummaryRow(label = "• المجموع الفرعي:", value = "${subtotal.toInt()}$")
-                                SummaryRow(label = "• التوصيل", value = "${deliveryFee.toInt()}$")
-                                Box(
+                                items(cartItems, key = { it.productId.ifBlank { it.id } }) { item ->
+                                    CartItemRow(
+                                        item = item,
+                                        onUpdateQty = onUpdateQty,
+                                        onRemoveItem = onRemoveItem
+                                    )
+                                }
+                            }
+
+                            Column(
+                                modifier = Modifier
+                                    .weight(0.85f)
+                                    .navigationBarsPadding(),
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                CartSummaryCard(
+                                    subtotal = subtotal,
+                                    deliveryFee = deliveryFee,
+                                    total = total
+                                )
+                                Button(
+                                    onClick = onProceedCheckout,
+                                    shape = RoundedCornerShape(18.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = ForestGreen),
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(1.dp)
-                                        .background(BorderSubtle)
+                                        .height(54.dp)
+                                        .testTag("proceed_checkout_button")
+                                ) {
+                                    Text(
+                                        text = strings.proceedCheckout,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = PureWhite,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(cartItems, key = { it.productId.ifBlank { it.id } }) { item ->
+                                CartItemRow(
+                                    item = item,
+                                    onUpdateQty = onUpdateQty,
+                                    onRemoveItem = onRemoveItem
                                 )
-                                SummaryRow(
-                                    label = "• المجموع الكلي:",
-                                    value = "${total.toInt()}$",
-                                    highlight = true
+                            }
+
+                            item {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                CartSummaryCard(
+                                    subtotal = subtotal,
+                                    deliveryFee = deliveryFee,
+                                    total = total
                                 )
                             }
                         }
-                    }
-                }
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .navigationBarsPadding()
-                        .padding(horizontal = 18.dp, vertical = 14.dp)
-                ) {
-                    Button(
-                        onClick = onProceedCheckout,
-                        shape = RoundedCornerShape(18.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = ForestGreen),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(54.dp)
-                            .testTag("proceed_checkout_button")
-                    ) {
-                        Text(
-                            text = "متابعة الدفع",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = PureWhite,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .navigationBarsPadding()
+                                .padding(horizontal = 18.dp, vertical = 14.dp)
+                        ) {
+                            Button(
+                                onClick = onProceedCheckout,
+                                shape = RoundedCornerShape(18.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = ForestGreen),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(54.dp)
+                                    .testTag("proceed_checkout_button")
+                            ) {
+                                Text(
+                                    text = strings.proceedCheckout,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = PureWhite,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun CartItemRow(
+    item: CartItem,
+    onUpdateQty: (String, Int) -> Unit,
+    onRemoveItem: (String) -> Unit
+) {
+    val strings = LocalAppStrings.current
+    val catalogProd = remember(item.productId) {
+        PharmacyCatalog.products.firstOrNull { it.id == item.productId }
+    }
+    val displayProd = catalogProd ?: PharmacyCatalog.products.first()
+    val displayName = catalogProd?.localizedName(strings.isEnglish) ?: item.productName
+    val docId = item.id.ifBlank { item.productId }
+
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = PureWhite,
+        shadowElevation = 2.dp,
+        border = BorderStroke(1.dp, BorderSubtle),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+                ProductPackageArt(
+                    product = displayProd,
+                    modifier = Modifier.size(72.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(
+                        text = displayName,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = TextPrimary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Filled.Star,
+                                contentDescription = strings.ratingLabel,
+                                tint = WarmGold,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text(
+                                text = item.rating.toString(),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextSecondary
+                            )
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = if (displayProd.requiresPrescription) StatusClosedBg else MintSoft
+                        ) {
+                            Text(
+                                text = if (displayProd.requiresPrescription) strings.rxShort else strings.otcShort,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (displayProd.requiresPrescription) StatusClosedRed else ForestGreen,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = strings.formatPrice(item.priceUsd * item.quantity),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = TextPrimary,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                IconButton(
+                    onClick = { onRemoveItem(docId) },
+                    modifier = Modifier.minimumInteractiveComponentSize()
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.DeleteOutline,
+                        contentDescription = strings.removeItem,
+                        tint = StatusClosedRed,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Box(
+                        modifier = Modifier.minimumInteractiveComponentSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Surface(
+                            onClick = { onUpdateQty(docId, (item.quantity + 1).toInt()) },
+                            shape = CircleShape,
+                            color = ForestGreen,
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Filled.Add,
+                                    contentDescription = strings.increaseQty,
+                                    tint = PureWhite,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+                    Text(
+                        text = item.quantity.toString(),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = TextPrimary
+                    )
+                    Box(
+                        modifier = Modifier.minimumInteractiveComponentSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Surface(
+                            onClick = { onUpdateQty(docId, (item.quantity - 1).toInt()) },
+                            shape = CircleShape,
+                            color = NeutralBackground,
+                            border = BorderStroke(1.dp, BorderSubtle),
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Filled.Remove,
+                                    contentDescription = strings.decreaseQty,
+                                    tint = ForestGreen,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CartSummaryCard(
+    subtotal: Double,
+    deliveryFee: Double,
+    total: Double
+) {
+    val strings = LocalAppStrings.current
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = NeutralBackground,
+        border = BorderStroke(1.dp, BorderSubtle),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            SummaryRow(label = strings.subtotalLabel, value = strings.formatPrice(subtotal))
+            SummaryRow(label = strings.deliveryLabel, value = strings.formatPrice(deliveryFee))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(BorderSubtle)
+            )
+            SummaryRow(
+                label = strings.totalLabel,
+                value = strings.formatPrice(total),
+                highlight = true
+            )
         }
     }
 }
@@ -391,29 +540,50 @@ private fun SummaryRow(label: String, value: String, highlight: Boolean = false)
 fun CheckoutScreen(
     cartItems: List<CartItem>,
     deliveryLocation: String,
+    isSubmitting: Boolean,
     onBack: () -> Unit,
-    onConfirmOrder: (paymentMethod: String, cardLast4: String?) -> Unit,
+    onConfirmOrder: (paymentMethod: String, cardLast4: String?, onSuccess: () -> Unit) -> Unit,
     onOrderCompleteGoHome: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val strings = LocalAppStrings.current
     var selectedMethod by remember { mutableStateOf("visa") }
     var holderName by remember { mutableStateOf("") }
-    var cardNumber by remember { mutableStateOf("0000 0000 0000 4423") }
-    var expiry by remember { mutableStateOf("17/11") }
-    var cvv by remember { mutableStateOf("505") }
+    var cardDigits by remember { mutableStateOf("") }
+    var expiryDigits by remember { mutableStateOf("") }
+    var cvvDigits by remember { mutableStateOf("") }
+    var validationAttempted by remember { mutableStateOf(false) }
     var showSuccessDialog by remember { mutableStateOf(false) }
 
-    val total = cartItems.sumOf { it.priceUsd * it.quantity } + if (cartItems.isEmpty()) 0.0 else 5.0
+    val formattedCardNumber = remember(cardDigits) {
+        cardDigits.chunked(4).joinToString(" ")
+    }
+    val formattedExpiry = remember(expiryDigits) {
+        if (expiryDigits.length <= 2) expiryDigits
+        else "${expiryDigits.take(2)}/${expiryDigits.drop(2)}"
+    }
 
-    Box(
+    val isHolderValid = holderName.trim().length >= 2
+    val isCardValid = cardDigits.length == 16
+    val expiryMonth = expiryDigits.take(2).toIntOrNull() ?: 0
+    val isExpiryValid = expiryDigits.length == 4 && expiryMonth in 1..12
+    val isCvvValid = cvvDigits.length in 3..4
+
+    val total = cartItems.sumOf { it.priceUsd * it.quantity } +
+        if (cartItems.isEmpty()) 0.0 else PharmacyCatalog.DELIVERY_FEE_MAD
+    val localizedDeliveryLocation = PharmacyCatalog.localizeLocation(deliveryLocation, strings.isEnglish)
+
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .background(PureWhite),
         contentAlignment = Alignment.TopCenter
     ) {
+        val maxContentWidth = if (maxWidth >= 600.dp) 700.dp else 600.dp
+
         Column(
             modifier = Modifier
-                .widthIn(max = 600.dp)
+                .widthIn(max = maxContentWidth)
                 .fillMaxSize()
         ) {
             Row(
@@ -426,13 +596,13 @@ fun CheckoutScreen(
             ) {
                 BackCircleButton(onClick = onBack)
                 Text(
-                    text = "الدفع",
+                    text = strings.checkoutTitle,
                     style = MaterialTheme.typography.headlineSmall,
                     color = TextPrimary
                 )
                 HeaderCircleIconButton(
                     onClick = {},
-                    contentDescription = "إجمالي الطلب",
+                    contentDescription = strings.orderTotalDesc,
                     badgeCount = cartItems.sumOf { it.quantity }.toInt()
                 ) {
                     Icon(
@@ -452,35 +622,37 @@ fun CheckoutScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    text = "أختر طريقة الدفع",
+                    text = strings.choosePaymentMethod,
                     style = MaterialTheme.typography.titleMedium,
                     color = TextPrimary
                 )
 
                 PaymentMethodOption(
-                    title = "ماستر كارد",
+                    title = strings.mastercard,
                     badgeText = "MC",
                     badgeColor = Color(0xFFEB5757),
                     selected = selectedMethod == "mastercard",
                     onClick = { selectedMethod = "mastercard" }
                 )
                 PaymentMethodOption(
-                    title = "بطاقة فيزا",
+                    title = strings.visa,
                     badgeText = "VISA",
                     badgeColor = Color(0xFF1A4B9C),
                     selected = selectedMethod == "visa",
                     onClick = { selectedMethod = "visa" }
                 )
                 PaymentMethodOption(
-                    title = "عند الاستلام",
-                    badgeText = "نقداً",
+                    title = strings.cashOnDelivery,
+                    badgeText = strings.cashLabel,
                     badgeColor = ForestGreen,
                     selected = selectedMethod == "cash",
-                    onClick = { selectedMethod = "cash" }
+                    onClick = {
+                        selectedMethod = "cash"
+                        validationAttempted = false
+                    }
                 )
 
                 if (selectedMethod != "cash") {
-                    // 3D Gradient Bank Card Preview matching mockup
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -520,7 +692,7 @@ fun CheckoutScreen(
                             }
 
                             Text(
-                                text = "••••  ••••  ••••  ${cardNumber.filter { it.isDigit() }.takeLast(4).ifEmpty { "4423" }}",
+                                text = "••••  ••••  ••••  ${cardDigits.takeLast(4).padStart(4, '•')}",
                                 color = PureWhite,
                                 fontSize = 19.sp,
                                 fontWeight = FontWeight.Bold,
@@ -532,13 +704,13 @@ fun CheckoutScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Text(
-                                    text = holderName.ifBlank { "CARD HOLDER" },
+                                    text = holderName.ifBlank { strings.cardHolderDefault },
                                     color = PureWhite.copy(alpha = 0.92f),
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
-                                    text = expiry.ifBlank { "17/11" },
+                                    text = formattedExpiry.ifBlank { strings.expiryPlaceholder },
                                     color = PureWhite.copy(alpha = 0.92f),
                                     style = MaterialTheme.typography.bodyMedium
                                 )
@@ -549,28 +721,44 @@ fun CheckoutScreen(
                     OutlinedTextField(
                         value = holderName,
                         onValueChange = { holderName = it },
-                        label = { Text("اسم حامل البطاقة") },
-                        placeholder = { Text("اسم حامل البطاقة") },
+                        label = { Text(strings.cardHolderLabel) },
+                        placeholder = { Text(strings.cardHolderPlaceholder) },
+                        isError = validationAttempted && !isHolderValid,
+                        supportingText = if (validationAttempted && !isHolderValid) {
+                            { Text(strings.errCardHolder) }
+                        } else null,
                         singleLine = true,
                         shape = RoundedCornerShape(14.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = ForestGreen,
                             unfocusedBorderColor = BorderSubtle
                         ),
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("checkout_holder_input")
                     )
 
                     OutlinedTextField(
-                        value = cardNumber,
-                        onValueChange = { cardNumber = it },
-                        label = { Text("رقم البطاقة") },
+                        value = formattedCardNumber,
+                        onValueChange = { input ->
+                            cardDigits = input.filter { it.isDigit() }.take(16)
+                        },
+                        label = { Text(strings.cardNumberLabel) },
+                        placeholder = { Text(strings.cardNumberPlaceholder) },
+                        isError = validationAttempted && !isCardValid,
+                        supportingText = if (validationAttempted && !isCardValid) {
+                            { Text(strings.errCardNumber) }
+                        } else null,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
                         shape = RoundedCornerShape(14.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = ForestGreen,
                             unfocusedBorderColor = BorderSubtle
                         ),
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("checkout_card_input")
                     )
 
                     Row(
@@ -578,28 +766,48 @@ fun CheckoutScreen(
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         OutlinedTextField(
-                            value = expiry,
-                            onValueChange = { expiry = it },
-                            label = { Text("تاريخ أنتهاء الصلاحية") },
+                            value = formattedExpiry,
+                            onValueChange = { input ->
+                                expiryDigits = input.filter { it.isDigit() }.take(4)
+                            },
+                            label = { Text(strings.expiryLabel) },
+                            placeholder = { Text(strings.expiryPlaceholder) },
+                            isError = validationAttempted && !isExpiryValid,
+                            supportingText = if (validationAttempted && !isExpiryValid) {
+                                { Text(strings.errExpiry) }
+                            } else null,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             singleLine = true,
                             shape = RoundedCornerShape(14.dp),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = ForestGreen,
                                 unfocusedBorderColor = BorderSubtle
                             ),
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("checkout_expiry_input")
                         )
                         OutlinedTextField(
-                            value = cvv,
-                            onValueChange = { cvv = it },
-                            label = { Text("رمز الأمان") },
+                            value = cvvDigits,
+                            onValueChange = { input ->
+                                cvvDigits = input.filter { it.isDigit() }.take(4)
+                            },
+                            label = { Text(strings.cvvLabel) },
+                            placeholder = { Text(strings.cvvPlaceholder) },
+                            isError = validationAttempted && !isCvvValid,
+                            supportingText = if (validationAttempted && !isCvvValid) {
+                                { Text(strings.errCvv) }
+                            } else null,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             singleLine = true,
                             shape = RoundedCornerShape(14.dp),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = ForestGreen,
                                 unfocusedBorderColor = BorderSubtle
                             ),
-                            modifier = Modifier.weight(0.75f)
+                            modifier = Modifier
+                                .weight(0.75f)
+                                .testTag("checkout_cvv_input")
                         )
                     }
                 } else {
@@ -622,12 +830,12 @@ fun CheckoutScreen(
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Text(
-                                    text = "الدفع نقداً عند الاستلام",
+                                    text = strings.cashPaymentTitle,
                                     style = MaterialTheme.typography.titleMedium,
                                     color = ForestGreen
                                 )
                                 Text(
-                                    text = "سيصل المندوب إلى ($deliveryLocation) خلال 30 دقيقة",
+                                    text = "${strings.cashPaymentEtaPrefix} ($localizedDeliveryLocation)",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = TextSecondary
                                 )
@@ -647,11 +855,18 @@ fun CheckoutScreen(
             ) {
                 Button(
                     onClick = {
-                        val last4 = cardNumber.filter { it.isDigit() }.takeLast(4).ifEmpty { "4423" }
-                        onConfirmOrder(selectedMethod, last4)
-                        showSuccessDialog = true
+                        if (selectedMethod != "cash") {
+                            validationAttempted = true
+                            if (!isHolderValid || !isCardValid || !isExpiryValid || !isCvvValid) {
+                                return@Button
+                            }
+                        }
+                        val last4 = if (selectedMethod == "cash") null else cardDigits.takeLast(4)
+                        onConfirmOrder(selectedMethod, last4) {
+                            showSuccessDialog = true
+                        }
                     },
-                    enabled = cartItems.isNotEmpty(),
+                    enabled = cartItems.isNotEmpty() && !isSubmitting,
                     shape = RoundedCornerShape(18.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = ForestGreen),
                     modifier = Modifier
@@ -659,18 +874,26 @@ fun CheckoutScreen(
                         .height(54.dp)
                         .testTag("confirm_order_button")
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.CreditCard,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "تأكيد الطلب (${total.toInt()}$)",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = PureWhite,
-                        fontWeight = FontWeight.Bold
-                    )
+                    if (isSubmitting) {
+                        CircularProgressIndicator(
+                            color = PureWhite,
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Filled.CreditCard,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "${strings.confirmOrder} (${strings.formatPrice(total)})",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = PureWhite,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
         }
@@ -693,7 +916,7 @@ fun CheckoutScreen(
             },
             title = {
                 Text(
-                    text = "تم تأكيد طلبك بنجاح",
+                    text = strings.orderConfirmedTitle,
                     style = MaterialTheme.typography.titleLarge,
                     color = TextPrimary,
                     textAlign = TextAlign.Center
@@ -701,7 +924,7 @@ fun CheckoutScreen(
             },
             text = {
                 Text(
-                    text = "جاري تجهيز أدويتك في أقرب صيدلية وسيتم التوصيل إلى ($deliveryLocation) خلال 30 دقيقة.",
+                    text = "${strings.orderConfirmedBodyPrefix} ($localizedDeliveryLocation)",
                     style = MaterialTheme.typography.bodyMedium,
                     color = TextSecondary,
                     textAlign = TextAlign.Center
@@ -715,7 +938,7 @@ fun CheckoutScreen(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = ForestGreen)
                 ) {
-                    Text("العودة للرئيسية", color = PureWhite)
+                    Text(strings.backToHome, color = PureWhite)
                 }
             }
         )

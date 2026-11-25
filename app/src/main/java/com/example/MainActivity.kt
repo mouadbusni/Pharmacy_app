@@ -6,6 +6,8 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -45,6 +47,7 @@ import com.example.ui.auth.LoginScreen
 import com.example.ui.auth.SplashScreen
 import com.example.ui.components.BottomTab
 import com.example.ui.components.PharmacyBottomBar
+import com.example.ui.components.PharmacyNavigationRail
 import com.example.ui.screens.CartScreen
 import com.example.ui.screens.ChatListScreen
 import com.example.ui.screens.CheckoutScreen
@@ -57,7 +60,10 @@ import com.example.ui.screens.PharmacyProfileScreen
 import com.example.ui.screens.ProductDetailScreen
 import com.example.ui.screens.ProfileScreen
 import com.example.ui.screens.SearchProductsScreen
+import com.example.ui.theme.ArabicStrings
+import com.example.ui.theme.EnglishStrings
 import com.example.ui.theme.ForestGreen
+import com.example.ui.theme.LocalAppStrings
 import com.example.ui.theme.PureWhite
 import com.example.ui.theme.SaydaliyatiTheme
 import com.example.viewmodel.PharmacyViewModel
@@ -80,6 +86,9 @@ object PharmacyRoutes {
     const val LIVE_CHAT = "live_chat"
     const val CART = "cart"
     const val CHECKOUT = "checkout"
+
+    fun searchRoute(categoryId: String = "all"): String =
+        "$SEARCH_PRODUCTS?category=$categoryId"
 }
 
 class MainActivity : ComponentActivity() {
@@ -110,7 +119,10 @@ fun AppContent(auth: FirebaseAuth = Firebase.auth) {
 
     val user = currentUser
     if (user == null && !isAdminBypass) {
-        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+        CompositionLocalProvider(
+            LocalLayoutDirection provides LayoutDirection.Rtl,
+            LocalAppStrings provides ArabicStrings
+        ) {
             if (!showLoginFromSplash) {
                 SplashScreen(
                     onStartClicked = { showLoginFromSplash = true },
@@ -187,6 +199,7 @@ private fun AuthenticatedPharmacyApp(
     val ordersState by viewModel.ordersState.collectAsStateWithLifecycle()
     val recentSearchesState by viewModel.recentSearchesState.collectAsStateWithLifecycle()
     val selectedHomeCategory by viewModel.selectedHomeCategory.collectAsStateWithLifecycle()
+    val isSubmittingOrder by viewModel.isSubmittingOrder.collectAsStateWithLifecycle()
     val actionMessage by viewModel.actionMessage.collectAsStateWithLifecycle()
 
     val profile = (profileState as? UiState.Success)?.data
@@ -194,11 +207,12 @@ private fun AuthenticatedPharmacyApp(
     val favoriteIds = ((favoritesState as? UiState.Success)?.data ?: emptyList())
         .map { it.productId }
         .toSet()
-    val orders = (ordersState as? UiState.Success)?.data ?: emptyList()
-    val recentSearches = (recentSearchesState as? UiState.Success)?.data ?: emptyList()
     val cartCount = cartItems.sumOf { it.quantity }.toInt()
 
-    val layoutDirection = if (profile?.language == "en") LayoutDirection.Ltr else LayoutDirection.Rtl
+    val isEnglish = profile?.language == "en"
+    val appStrings = if (isEnglish) EnglishStrings else ArabicStrings
+    val layoutDirection = if (isEnglish) LayoutDirection.Ltr else LayoutDirection.Rtl
+
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: PharmacyRoutes.HOME
@@ -219,247 +233,304 @@ private fun AuthenticatedPharmacyApp(
         PharmacyRoutes.PROFILE
     )
 
-    CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            NavHost(
-                navController = navController,
-                startDestination = PharmacyRoutes.HOME
-            ) {
-                composable(PharmacyRoutes.HOME) {
-                    HomeScreen(
-                        selectedLocation = profile?.selectedLocation ?: "الموقع الحالي",
-                        selectedCategoryId = selectedHomeCategory,
-                        favoriteProductIds = favoriteIds,
-                        onSelectCategory = viewModel::selectHomeCategory,
-                        onSelectLocation = viewModel::updateLocation,
-                        onOpenSearch = { navController.navigate(PharmacyRoutes.SEARCH_PRODUCTS) },
-                        onOpenNotifications = { navController.navigate(PharmacyRoutes.NOTIFICATIONS) },
-                        onOpenSettings = { navController.navigate(PharmacyRoutes.PROFILE) },
-                        onOpenProduct = { prod ->
-                            navController.navigate("${PharmacyRoutes.PRODUCT_DETAIL}/${prod.id}")
-                        },
-                        onOpenPharmacy = { pharmacy ->
-                            navController.navigate("${PharmacyRoutes.PHARMACY_PROFILE}/${pharmacy.id}")
-                        },
-                        onOpenPharmaciesList = {
-                            navController.navigate(PharmacyRoutes.PHARMACIES_LIST)
-                        },
-                        onAddToCart = { prod -> viewModel.addToCart(prod, 1) },
-                        onToggleFavorite = viewModel::toggleFavorite
-                    )
-                }
+    val onNavigateTab: (BottomTab) -> Unit = { tab ->
+        val targetRoute = when (tab) {
+            BottomTab.HOME -> PharmacyRoutes.HOME
+            BottomTab.NOTIFICATIONS -> PharmacyRoutes.NOTIFICATIONS
+            BottomTab.FAVORITES -> PharmacyRoutes.FAVORITES
+            BottomTab.PROFILE -> PharmacyRoutes.PROFILE
+        }
+        if (currentRoute != targetRoute) {
+            navController.navigate(targetRoute) {
+                popUpTo(PharmacyRoutes.HOME) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
+        }
+    }
 
-                composable(PharmacyRoutes.NOTIFICATIONS) {
-                    NotificationsScreen(
-                        onBack = { navController.popBackStack() },
-                        onOpenChats = { navController.navigate(PharmacyRoutes.CHATS) }
-                    )
-                }
+    CompositionLocalProvider(
+        LocalLayoutDirection provides layoutDirection,
+        LocalAppStrings provides appStrings
+    ) {
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val isWide = maxWidth >= 600.dp
+            val showTopLevelNav = currentRoute in topLevelRoutes
 
-                composable(PharmacyRoutes.FAVORITES) {
-                    FavoritesScreen(
-                        favoriteProductIds = favoriteIds,
-                        onBack = { navController.popBackStack() },
-                        onOpenProduct = { prod ->
-                            navController.navigate("${PharmacyRoutes.PRODUCT_DETAIL}/${prod.id}")
-                        },
-                        onAddToCart = { prod -> viewModel.addToCart(prod, 1) },
-                        onToggleFavorite = viewModel::toggleFavorite
-                    )
-                }
-
-                composable(PharmacyRoutes.PROFILE) {
-                    ProfileScreen(
-                        profile = profile,
-                        orders = orders,
-                        isAdminMode = isAdminMode,
-                        onBack = { navController.popBackStack() },
-                        onToggleLanguage = viewModel::toggleLanguage,
-                        onToggleNotifications = viewModel::toggleNotifications,
-                        onSignedOut = onSignedOut
-                    )
-                }
-
-                composable(PharmacyRoutes.SEARCH_PRODUCTS) {
-                    SearchProductsScreen(
-                        recentSearches = recentSearches,
-                        favoriteProductIds = favoriteIds,
+            Row(modifier = Modifier.fillMaxSize()) {
+                if (showTopLevelNav && isWide) {
+                    PharmacyNavigationRail(
+                        currentRoute = currentRoute,
                         cartCount = cartCount,
-                        onBack = { navController.popBackStack() },
-                        onOpenCart = { navController.navigate(PharmacyRoutes.CART) },
-                        onOpenProduct = { prod ->
-                            navController.navigate("${PharmacyRoutes.PRODUCT_DETAIL}/${prod.id}")
-                        },
-                        onAddToCart = { prod -> viewModel.addToCart(prod, 1) },
-                        onToggleFavorite = viewModel::toggleFavorite,
-                        onSubmitSearch = viewModel::addSearchQuery,
-                        onDeleteRecentSearch = viewModel::deleteSearchChip
+                        onNavigateTab = onNavigateTab,
+                        onOpenCart = { navController.navigate(PharmacyRoutes.CART) }
                     )
                 }
 
-                composable(PharmacyRoutes.PHARMACIES_LIST) {
-                    PharmaciesListScreen(
-                        cartCount = cartCount,
-                        onBack = { navController.popBackStack() },
-                        onOpenCart = { navController.navigate(PharmacyRoutes.CART) },
-                        onOpenPharmacy = { pharmacy ->
-                            navController.navigate("${PharmacyRoutes.PHARMACY_PROFILE}/${pharmacy.id}")
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxSize()
+                ) {
+                    NavHost(
+                        navController = navController,
+                        startDestination = PharmacyRoutes.HOME
+                    ) {
+                        composable(PharmacyRoutes.HOME) {
+                            HomeScreen(
+                                selectedLocation = profile?.selectedLocation ?: "الموقع الحالي",
+                                selectedCategoryId = selectedHomeCategory,
+                                favoriteProductIds = favoriteIds,
+                                onSelectCategory = viewModel::selectHomeCategory,
+                                onSelectLocation = viewModel::updateLocation,
+                                onOpenSearch = { categoryId ->
+                                    navController.navigate(PharmacyRoutes.searchRoute(categoryId))
+                                },
+                                onOpenNotifications = { navController.navigate(PharmacyRoutes.NOTIFICATIONS) },
+                                onOpenSettings = { navController.navigate(PharmacyRoutes.PROFILE) },
+                                onOpenProduct = { prod ->
+                                    navController.navigate("${PharmacyRoutes.PRODUCT_DETAIL}/${prod.id}")
+                                },
+                                onOpenPharmacy = { pharmacy ->
+                                    navController.navigate("${PharmacyRoutes.PHARMACY_PROFILE}/${pharmacy.id}")
+                                },
+                                onOpenPharmaciesList = {
+                                    navController.navigate(PharmacyRoutes.PHARMACIES_LIST)
+                                },
+                                onAddToCart = { prod -> viewModel.addToCart(prod, 1) },
+                                onToggleFavorite = viewModel::toggleFavorite
+                            )
                         }
-                    )
-                }
 
-                composable(
-                    route = "${PharmacyRoutes.PRODUCT_DETAIL}/{productId}",
-                    arguments = listOf(navArgument("productId") { type = NavType.StringType })
-                ) { backStackEntry ->
-                    val productId = backStackEntry.arguments?.getString("productId") ?: "prod_biosteron"
-                    val product = viewModel.findProduct(productId)
-                    val isFav = favoriteIds.contains(product.id)
-                    ProductDetailScreen(
-                        product = product,
-                        isFavorite = isFav,
-                        favoriteProductIds = favoriteIds,
-                        cartCount = cartCount,
-                        onBack = { navController.popBackStack() },
-                        onOpenCart = { navController.navigate(PharmacyRoutes.CART) },
-                        onToggleFavorite = viewModel::toggleFavorite,
-                        onAddToCart = { p, qty -> viewModel.addToCart(p, qty) },
-                        onOpenProduct = { related ->
-                            navController.navigate("${PharmacyRoutes.PRODUCT_DETAIL}/${related.id}")
-                        },
-                        onOpenSearch = { navController.navigate(PharmacyRoutes.SEARCH_PRODUCTS) }
-                    )
-                }
-
-                composable(
-                    route = "${PharmacyRoutes.PHARMACY_PROFILE}/{pharmacyId}",
-                    arguments = listOf(navArgument("pharmacyId") { type = NavType.StringType })
-                ) { backStackEntry ->
-                    val pharmacyId = backStackEntry.arguments?.getString("pharmacyId") ?: "pharm_mariam"
-                    val pharmacy = PharmacyCatalog.pharmacies.firstOrNull { it.id == pharmacyId }
-                        ?: PharmacyCatalog.pharmacies.first()
-                    PharmacyProfileScreen(
-                        pharmacy = pharmacy,
-                        favoriteProductIds = favoriteIds,
-                        cartCount = cartCount,
-                        onBack = { navController.popBackStack() },
-                        onOpenCart = { navController.navigate(PharmacyRoutes.CART) },
-                        onOpenChat = { target ->
-                            navController.navigate("${PharmacyRoutes.LIVE_CHAT}/${target.id}")
-                        },
-                        onOpenChatsList = { navController.navigate(PharmacyRoutes.CHATS) },
-                        onOpenProduct = { prod ->
-                            navController.navigate("${PharmacyRoutes.PRODUCT_DETAIL}/${prod.id}")
-                        },
-                        onOpenSearch = { navController.navigate(PharmacyRoutes.SEARCH_PRODUCTS) },
-                        onAddToCart = { prod -> viewModel.addToCart(prod, 1) },
-                        onToggleFavorite = viewModel::toggleFavorite
-                    )
-                }
-
-                composable(PharmacyRoutes.CHATS) {
-                    ChatListScreen(
-                        onBack = { navController.popBackStack() },
-                        onOpenNotifications = { navController.navigate(PharmacyRoutes.NOTIFICATIONS) },
-                        onOpenLiveChat = { pharmacy ->
-                            navController.navigate("${PharmacyRoutes.LIVE_CHAT}/${pharmacy.id}")
-                        },
-                        onOpenPharmaciesList = {
-                            navController.navigate(PharmacyRoutes.PHARMACIES_LIST)
+                        composable(PharmacyRoutes.NOTIFICATIONS) {
+                            NotificationsScreen(
+                                onBack = { navController.popBackStack() },
+                                onOpenPromoVitamins = {
+                                    navController.navigate(PharmacyRoutes.searchRoute("vitamins"))
+                                },
+                                onOpenChats = { navController.navigate(PharmacyRoutes.CHATS) },
+                                onOpenPharmacies = { navController.navigate(PharmacyRoutes.PHARMACIES_LIST) }
+                            )
                         }
-                    )
-                }
 
-                composable(
-                    route = "${PharmacyRoutes.LIVE_CHAT}/{pharmacyId}",
-                    arguments = listOf(navArgument("pharmacyId") { type = NavType.StringType })
-                ) { backStackEntry ->
-                    val pharmacyId = backStackEntry.arguments?.getString("pharmacyId") ?: "pharm_perla"
-                    val pharmacy = PharmacyCatalog.pharmacies.firstOrNull { it.id == pharmacyId }
-                        ?: PharmacyCatalog.pharmacies.first()
-                    val chatState by remember(pharmacyId) {
-                        viewModel.observePharmacyChat(pharmacyId)
-                    }.collectAsStateWithLifecycle(initialValue = UiState.Loading)
+                        composable(PharmacyRoutes.FAVORITES) {
+                            FavoritesScreen(
+                                favoritesState = favoritesState,
+                                onBack = { navController.popBackStack() },
+                                onOpenProduct = { prod ->
+                                    navController.navigate("${PharmacyRoutes.PRODUCT_DETAIL}/${prod.id}")
+                                },
+                                onAddToCart = { prod -> viewModel.addToCart(prod, 1) },
+                                onToggleFavorite = viewModel::toggleFavorite,
+                                onRetry = viewModel::retryAll
+                            )
+                        }
 
-                    LiveChatScreen(
-                        pharmacy = pharmacy,
-                        chatState = chatState,
-                        onBack = { navController.popBackStack() },
-                        onSendMessage = { msg -> viewModel.sendMessage(pharmacy.id, msg) }
-                    )
-                }
+                        composable(PharmacyRoutes.PROFILE) {
+                            ProfileScreen(
+                                profile = profile,
+                                ordersState = ordersState,
+                                isAdminMode = isAdminMode,
+                                onBack = { navController.popBackStack() },
+                                onToggleLanguage = viewModel::toggleLanguage,
+                                onToggleNotifications = viewModel::toggleNotifications,
+                                onRetry = viewModel::retryAll,
+                                onSignedOut = onSignedOut
+                            )
+                        }
 
-                composable(PharmacyRoutes.CART) {
-                    CartScreen(
-                        cartItems = cartItems,
-                        onBack = { navController.popBackStack() },
-                        onUpdateQty = viewModel::updateCartQuantity,
-                        onRemoveItem = viewModel::removeFromCart,
-                        onProceedCheckout = { navController.navigate(PharmacyRoutes.CHECKOUT) },
-                        onBrowseProducts = { navController.navigate(PharmacyRoutes.SEARCH_PRODUCTS) }
-                    )
-                }
+                        composable(
+                            route = "${PharmacyRoutes.SEARCH_PRODUCTS}?category={category}",
+                            arguments = listOf(
+                                navArgument("category") {
+                                    type = NavType.StringType
+                                    defaultValue = "all"
+                                }
+                            )
+                        ) { backStackEntry ->
+                            val categoryArg = backStackEntry.arguments?.getString("category") ?: "all"
+                            SearchProductsScreen(
+                                initialCategoryId = categoryArg,
+                                recentSearchesState = recentSearchesState,
+                                favoriteProductIds = favoriteIds,
+                                cartCount = cartCount,
+                                onBack = { navController.popBackStack() },
+                                onOpenCart = { navController.navigate(PharmacyRoutes.CART) },
+                                onOpenProduct = { prod ->
+                                    navController.navigate("${PharmacyRoutes.PRODUCT_DETAIL}/${prod.id}")
+                                },
+                                onAddToCart = { prod -> viewModel.addToCart(prod, 1) },
+                                onToggleFavorite = viewModel::toggleFavorite,
+                                onSubmitSearch = viewModel::addSearchQuery,
+                                onDeleteRecentSearch = viewModel::deleteSearchChip,
+                                onRetry = viewModel::retryAll
+                            )
+                        }
 
-                composable(PharmacyRoutes.CHECKOUT) {
-                    CheckoutScreen(
-                        cartItems = cartItems,
-                        deliveryLocation = profile?.selectedLocation ?: "الموقع الحالي",
-                        onBack = { navController.popBackStack() },
-                        onConfirmOrder = { method, last4 ->
-                            viewModel.placeOrder(
-                                paymentMethod = method,
+                        composable(PharmacyRoutes.PHARMACIES_LIST) {
+                            PharmaciesListScreen(
+                                cartCount = cartCount,
+                                onBack = { navController.popBackStack() },
+                                onOpenCart = { navController.navigate(PharmacyRoutes.CART) },
+                                onOpenPharmacy = { pharmacy ->
+                                    navController.navigate("${PharmacyRoutes.PHARMACY_PROFILE}/${pharmacy.id}")
+                                }
+                            )
+                        }
+
+                        composable(
+                            route = "${PharmacyRoutes.PRODUCT_DETAIL}/{productId}",
+                            arguments = listOf(navArgument("productId") { type = NavType.StringType })
+                        ) { backStackEntry ->
+                            val productId = backStackEntry.arguments?.getString("productId") ?: "prod_doliprane"
+                            val product = viewModel.findProduct(productId)
+                            val isFav = favoriteIds.contains(product.id)
+                            ProductDetailScreen(
+                                product = product,
+                                isFavorite = isFav,
+                                favoriteProductIds = favoriteIds,
+                                cartCount = cartCount,
+                                onBack = { navController.popBackStack() },
+                                onOpenCart = { navController.navigate(PharmacyRoutes.CART) },
+                                onToggleFavorite = viewModel::toggleFavorite,
+                                onAddToCart = { p, qty -> viewModel.addToCart(p, qty) },
+                                onOpenProduct = { related ->
+                                    navController.navigate("${PharmacyRoutes.PRODUCT_DETAIL}/${related.id}")
+                                },
+                                onOpenSearch = { catId ->
+                                    navController.navigate(PharmacyRoutes.searchRoute(catId))
+                                }
+                            )
+                        }
+
+                        composable(
+                            route = "${PharmacyRoutes.PHARMACY_PROFILE}/{pharmacyId}",
+                            arguments = listOf(navArgument("pharmacyId") { type = NavType.StringType })
+                        ) { backStackEntry ->
+                            val pharmacyId = backStackEntry.arguments?.getString("pharmacyId") ?: "pharm_du_lys"
+                            val pharmacy = PharmacyCatalog.pharmacies.firstOrNull { it.id == pharmacyId }
+                                ?: PharmacyCatalog.pharmacies.first()
+                            PharmacyProfileScreen(
+                                pharmacy = pharmacy,
+                                favoriteProductIds = favoriteIds,
+                                cartCount = cartCount,
+                                onBack = { navController.popBackStack() },
+                                onOpenCart = { navController.navigate(PharmacyRoutes.CART) },
+                                onOpenChat = { target ->
+                                    navController.navigate("${PharmacyRoutes.LIVE_CHAT}/${target.id}")
+                                },
+                                onOpenChatsList = { navController.navigate(PharmacyRoutes.CHATS) },
+                                onOpenProduct = { prod ->
+                                    navController.navigate("${PharmacyRoutes.PRODUCT_DETAIL}/${prod.id}")
+                                },
+                                onOpenSearch = { catId ->
+                                    navController.navigate(PharmacyRoutes.searchRoute(catId))
+                                },
+                                onAddToCart = { prod -> viewModel.addToCart(prod, 1) },
+                                onToggleFavorite = viewModel::toggleFavorite
+                            )
+                        }
+
+                        composable(PharmacyRoutes.CHATS) {
+                            ChatListScreen(
+                                onBack = { navController.popBackStack() },
+                                onOpenNotifications = { navController.navigate(PharmacyRoutes.NOTIFICATIONS) },
+                                onOpenLiveChat = { pharmacy ->
+                                    navController.navigate("${PharmacyRoutes.LIVE_CHAT}/${pharmacy.id}")
+                                },
+                                onOpenPharmaciesList = {
+                                    navController.navigate(PharmacyRoutes.PHARMACIES_LIST)
+                                }
+                            )
+                        }
+
+                        composable(
+                            route = "${PharmacyRoutes.LIVE_CHAT}/{pharmacyId}",
+                            arguments = listOf(navArgument("pharmacyId") { type = NavType.StringType })
+                        ) { backStackEntry ->
+                            val pharmacyId = backStackEntry.arguments?.getString("pharmacyId") ?: "pharm_khouloud"
+                            val pharmacy = PharmacyCatalog.pharmacies.firstOrNull { it.id == pharmacyId }
+                                ?: PharmacyCatalog.pharmacies.first()
+                            val chatState by remember(pharmacyId) {
+                                viewModel.observePharmacyChat(pharmacyId)
+                            }.collectAsStateWithLifecycle(initialValue = UiState.Loading)
+
+                            LiveChatScreen(
+                                pharmacy = pharmacy,
+                                chatState = chatState,
+                                onBack = { navController.popBackStack() },
+                                onSendMessage = { msg -> viewModel.sendMessage(pharmacy.id, msg) },
+                                onRetry = viewModel::retryAll
+                            )
+                        }
+
+                        composable(PharmacyRoutes.CART) {
+                            CartScreen(
+                                cartState = cartState,
+                                onBack = { navController.popBackStack() },
+                                onUpdateQty = viewModel::updateCartQuantity,
+                                onRemoveItem = viewModel::removeFromCart,
+                                onProceedCheckout = { navController.navigate(PharmacyRoutes.CHECKOUT) },
+                                onBrowseProducts = {
+                                    navController.navigate(PharmacyRoutes.searchRoute("all"))
+                                },
+                                onRetry = viewModel::retryAll
+                            )
+                        }
+
+                        composable(PharmacyRoutes.CHECKOUT) {
+                            CheckoutScreen(
                                 cartItems = cartItems,
                                 deliveryLocation = profile?.selectedLocation ?: "الموقع الحالي",
-                                cardLast4 = last4,
-                                onSuccess = { }
+                                isSubmitting = isSubmittingOrder,
+                                onBack = { navController.popBackStack() },
+                                onConfirmOrder = { method, last4, onSuccess ->
+                                    viewModel.placeOrder(
+                                        paymentMethod = method,
+                                        cartItems = cartItems,
+                                        deliveryLocation = profile?.selectedLocation ?: "الموقع الحالي",
+                                        cardLast4 = last4,
+                                        onSuccess = onSuccess
+                                    )
+                                },
+                                onOrderCompleteGoHome = {
+                                    navController.navigate(PharmacyRoutes.HOME) {
+                                        popUpTo(PharmacyRoutes.HOME) { inclusive = true }
+                                    }
+                                }
                             )
-                        },
-                        onOrderCompleteGoHome = {
-                            navController.navigate(PharmacyRoutes.HOME) {
-                                popUpTo(PharmacyRoutes.HOME) { inclusive = true }
-                            }
                         }
-                    )
+                    }
+
+                    if (showTopLevelNav && !isWide) {
+                        PharmacyBottomBar(
+                            currentRoute = currentRoute,
+                            cartCount = cartCount,
+                            onNavigateTab = onNavigateTab,
+                            onOpenCart = { navController.navigate(PharmacyRoutes.CART) },
+                            modifier = Modifier.align(Alignment.BottomCenter)
+                        )
+                    }
+
+                    SnackbarHost(
+                        hostState = snackbarHostState,
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .navigationBarsPadding()
+                            .padding(
+                                bottom = if (showTopLevelNav && !isWide) 86.dp else 16.dp,
+                                start = 16.dp,
+                                end = 16.dp
+                            )
+                    ) { data ->
+                        Snackbar(
+                            snackbarData = data,
+                            shape = RoundedCornerShape(14.dp),
+                            containerColor = ForestGreen,
+                            contentColor = PureWhite
+                        )
+                    }
                 }
-            }
-
-            if (currentRoute in topLevelRoutes) {
-                PharmacyBottomBar(
-                    currentRoute = currentRoute,
-                    cartCount = cartCount,
-                    onNavigateTab = { tab ->
-                        val targetRoute = when (tab) {
-                            BottomTab.HOME -> PharmacyRoutes.HOME
-                            BottomTab.NOTIFICATIONS -> PharmacyRoutes.NOTIFICATIONS
-                            BottomTab.FAVORITES -> PharmacyRoutes.FAVORITES
-                            BottomTab.PROFILE -> PharmacyRoutes.PROFILE
-                        }
-                        if (currentRoute != targetRoute) {
-                            navController.navigate(targetRoute) {
-                                popUpTo(PharmacyRoutes.HOME) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        }
-                    },
-                    onOpenCart = { navController.navigate(PharmacyRoutes.CART) },
-                    modifier = Modifier.align(Alignment.BottomCenter)
-                )
-            }
-
-            SnackbarHost(
-                hostState = snackbarHostState,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .navigationBarsPadding()
-                    .padding(bottom = 86.dp, start = 16.dp, end = 16.dp)
-            ) { data ->
-                Snackbar(
-                    snackbarData = data,
-                    shape = RoundedCornerShape(14.dp),
-                    containerColor = ForestGreen,
-                    contentColor = PureWhite
-                )
             }
         }
     }

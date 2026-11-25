@@ -35,7 +35,7 @@ class LocalAdminPharmacyRepository : PharmacyDataSource {
 
     private val _cart = MutableStateFlow(
         listOf(
-            PharmacyCatalog.products.first { it.id == "prod_biosteron" }.let { prod ->
+            PharmacyCatalog.products.first { it.id == "prod_doliprane" }.let { prod ->
                 CartItem(
                     id = prod.id,
                     userId = "admin_session",
@@ -47,7 +47,7 @@ class LocalAdminPharmacyRepository : PharmacyDataSource {
                     rating = prod.rating
                 )
             },
-            PharmacyCatalog.products.first { it.id == "prod_utorinic" }.let { prod ->
+            PharmacyCatalog.products.first { it.id == "prod_vitac" }.let { prod ->
                 CartItem(
                     id = prod.id,
                     userId = "admin_session",
@@ -205,7 +205,7 @@ class LocalAdminPharmacyRepository : PharmacyDataSource {
     ): Result<Unit> {
         if (cartItems.isEmpty()) return Result.failure(IllegalArgumentException("Cart is empty"))
         val subtotal = cartItems.sumOf { it.priceUsd * it.quantity }
-        val delivery = 5.0
+        val delivery = PharmacyCatalog.DELIVERY_FEE_MAD
         val order = PharmacyOrder(
             id = "admin_ord_${UUID.randomUUID().toString().take(8)}",
             userId = "admin_session",

@@ -1,12 +1,18 @@
 package com.example.ui.screens
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -23,12 +29,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
-import android.content.Intent
-import android.net.Uri
-import android.widget.Toast
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.HelpOutline
@@ -70,32 +70,39 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.credentials.CredentialManager
 import com.example.R
+import com.example.data.catalog.PharmacyCatalog
 import com.example.data.model.PharmacyOrder
 import com.example.data.model.UserProfile
 import com.example.ui.auth.signOut
 import com.example.ui.components.BackCircleButton
+import com.example.ui.components.ErrorStateCard
 import com.example.ui.components.HeaderCircleIconButton
+import com.example.ui.components.LoadingStateCard
 import com.example.ui.theme.BorderSubtle
 import com.example.ui.theme.ForestGreen
 import com.example.ui.theme.ForestGreenLight
+import com.example.ui.theme.LocalAppStrings
 import com.example.ui.theme.MintSoft
 import com.example.ui.theme.MintTeal
 import com.example.ui.theme.NeutralBackground
 import com.example.ui.theme.PureWhite
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
+import com.example.viewmodel.UiState
 
 @Composable
 fun ProfileScreen(
     profile: UserProfile?,
-    orders: List<PharmacyOrder>,
+    ordersState: UiState<List<PharmacyOrder>>,
     isAdminMode: Boolean = false,
     onBack: () -> Unit,
     onToggleLanguage: (String) -> Unit,
     onToggleNotifications: (Boolean) -> Unit,
+    onRetry: () -> Unit,
     onSignedOut: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val strings = LocalAppStrings.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val credentialManager = remember(context) { CredentialManager.create(context) }
@@ -108,21 +115,29 @@ fun ProfileScreen(
 
     val currentLanguage = profile?.language ?: "ar"
     val notificationsEnabled = profile?.notificationsEnabled ?: true
+    val orders = (ordersState as? UiState.Success)?.data ?: emptyList()
+    val defaultLocDisplay = PharmacyCatalog.localizeLocation(
+        profile?.selectedLocation ?: "الموقع الحالي",
+        strings.isEnglish
+    )
 
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .background(PureWhite),
         contentAlignment = Alignment.TopCenter
     ) {
+        val isWide = maxWidth >= 600.dp
+        val maxContentWidth = if (isWide) 680.dp else 600.dp
+        val bottomClearance = if (isWide) 28.dp else 112.dp
+
         Column(
             modifier = Modifier
-                .widthIn(max = 600.dp)
+                .widthIn(max = maxContentWidth)
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(bottom = 110.dp)
+                .padding(bottom = bottomClearance)
         ) {
-            // Curved Dark Green Top Banner + Overlapping Avatar
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -156,19 +171,19 @@ fun ProfileScreen(
                 ) {
                     BackCircleButton(onClick = onBack, darkSurface = true)
                     Text(
-                        text = "الإعدادات",
+                        text = strings.settings,
                         style = MaterialTheme.typography.titleLarge,
                         color = PureWhite
                     )
                     HeaderCircleIconButton(
                         onClick = { showSettingsDialog = true },
-                        contentDescription = "تعديل الإعدادات",
+                        contentDescription = strings.accountSettingsTitle,
                         backgroundColor = PureWhite.copy(alpha = 0.2f),
                         iconTint = PureWhite
                     ) {
                         Icon(
                             imageVector = Icons.Filled.Settings,
-                            contentDescription = "الإعدادات",
+                            contentDescription = strings.settings,
                             tint = PureWhite,
                             modifier = Modifier.size(18.dp)
                         )
@@ -187,7 +202,7 @@ fun ProfileScreen(
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = Icons.Filled.Settings,
-                            contentDescription = "إعدادات التطبيق",
+                            contentDescription = strings.appPreferences,
                             tint = ForestGreen,
                             modifier = Modifier.size(42.dp)
                         )
@@ -197,7 +212,6 @@ fun ProfileScreen(
 
             Spacer(modifier = Modifier.height(22.dp))
 
-            // Dark Forest Green Rounded Profile Card containing white settings rows + Sign Out
             Surface(
                 shape = RoundedCornerShape(28.dp),
                 color = ForestGreen,
@@ -214,7 +228,7 @@ fun ProfileScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text(
-                        text = "تفضيلات التطبيق",
+                        text = strings.appPreferences,
                         style = MaterialTheme.typography.headlineSmall,
                         color = PureWhite
                     )
@@ -224,7 +238,7 @@ fun ProfileScreen(
                             color = MintTeal.copy(alpha = 0.25f)
                         ) {
                             Text(
-                                text = "وضع المسؤول (بدون تسجيل دخول)",
+                                text = strings.adminModeBadge,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = PureWhite,
                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
@@ -235,35 +249,35 @@ fun ProfileScreen(
                     Spacer(modifier = Modifier.height(4.dp))
 
                     ProfileMenuRow(
-                        title = if (currentLanguage == "ar") "تغير اللغة (العربية)" else "تغير اللغة (English)",
+                        title = strings.languageRowLabel,
                         icon = Icons.Filled.Language,
                         onClick = { onToggleLanguage(currentLanguage) },
                         modifier = Modifier.testTag("profile_language_row")
                     )
 
                     ProfileMenuRow(
-                        title = "الإعدادات",
+                        title = strings.settings,
                         icon = Icons.Filled.Settings,
                         onClick = { showSettingsDialog = true },
                         modifier = Modifier.testTag("profile_settings_row")
                     )
 
                     ProfileMenuRow(
-                        title = "الطلبات والمساعدة (${orders.size})",
+                        title = "${strings.ordersHelpPrefix} (${orders.size})",
                         icon = Icons.AutoMirrored.Filled.HelpOutline,
                         onClick = { showHelpOrdersDialog = true },
                         modifier = Modifier.testTag("profile_help_row")
                     )
 
                     ProfileMenuRow(
-                        title = "رابط التطبيق وتحميله",
+                        title = strings.appLinkRow,
                         icon = Icons.Filled.Share,
                         onClick = { showAppLinkDialog = true },
                         modifier = Modifier.testTag("profile_app_link_row")
                     )
 
                     ProfileMenuRow(
-                        title = "حول التطبيق",
+                        title = strings.aboutApp,
                         icon = Icons.Filled.Info,
                         onClick = { showAboutDialog = true },
                         modifier = Modifier.testTag("profile_about_row")
@@ -297,13 +311,13 @@ fun ProfileScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ExitToApp,
-                                contentDescription = "تسجيل الخروج",
+                                contentDescription = strings.signOut,
                                 tint = PureWhite,
                                 modifier = Modifier.size(20.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "تسجيل الخروج",
+                                text = strings.signOut,
                                 style = MaterialTheme.typography.titleMedium,
                                 color = PureWhite,
                                 fontWeight = FontWeight.Bold
@@ -321,7 +335,7 @@ fun ProfileScreen(
             containerColor = PureWhite,
             title = {
                 Text(
-                    text = "إعدادات الحساب",
+                    text = strings.accountSettingsTitle,
                     style = MaterialTheme.typography.titleLarge,
                     color = TextPrimary
                 )
@@ -334,9 +348,10 @@ fun ProfileScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "إشعارات الطلبات والعروض",
+                            text = strings.orderNotificationsToggle,
                             style = MaterialTheme.typography.bodyLarge,
-                            color = TextPrimary
+                            color = TextPrimary,
+                            modifier = Modifier.weight(1f)
                         )
                         Switch(
                             checked = notificationsEnabled,
@@ -348,7 +363,7 @@ fun ProfileScreen(
                         )
                     }
                     Text(
-                        text = "عنوان التوصيل الافتراضي: ${profile?.selectedLocation ?: "الموقع الحالي"}",
+                        text = "${strings.defaultDeliveryAddress} $defaultLocDisplay",
                         style = MaterialTheme.typography.bodyMedium,
                         color = TextSecondary
                     )
@@ -356,7 +371,7 @@ fun ProfileScreen(
             },
             confirmButton = {
                 TextButton(onClick = { showSettingsDialog = false }) {
-                    Text("حسناً", color = ForestGreen, fontWeight = FontWeight.Bold)
+                    Text(strings.ok, color = ForestGreen, fontWeight = FontWeight.Bold)
                 }
             }
         )
@@ -368,59 +383,80 @@ fun ProfileScreen(
             containerColor = PureWhite,
             title = {
                 Text(
-                    text = "طلباتي السابقة والمساعدة",
+                    text = strings.ordersHelpTitle,
                     style = MaterialTheme.typography.titleLarge,
                     color = TextPrimary
                 )
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    if (orders.isEmpty()) {
-                        Text(
-                            text = "لا توجد طلبات مكتملة بعد. يمكنك إضافة الأدوية للسلة وإتمام الطلب خلال 30 دقيقة.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = TextSecondary
+                    when (ordersState) {
+                        UiState.Loading -> LoadingStateCard()
+                        is UiState.Error -> ErrorStateCard(
+                            errorMessage = ordersState.message,
+                            onRetry = onRetry
                         )
-                    } else {
-                        orders.take(4).forEach { order ->
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = NeutralBackground,
-                                border = BorderStroke(1.dp, BorderSubtle),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(10.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(
-                                            imageVector = Icons.AutoMirrored.Filled.ReceiptLong,
-                                            contentDescription = null,
-                                            tint = ForestGreen,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Column {
+                        is UiState.Success -> {
+                            if (orders.isEmpty()) {
+                                Text(
+                                    text = strings.noOrdersYet,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = TextSecondary
+                                )
+                            } else {
+                                orders.take(4).forEach { order ->
+                                    val methodLabel = when (order.paymentMethod) {
+                                        "visa" -> strings.visa
+                                        "mastercard" -> strings.mastercard
+                                        else -> strings.cashLabel
+                                    }
+                                    val locDisplay = PharmacyCatalog.localizeLocation(
+                                        order.deliveryLocation,
+                                        strings.isEnglish
+                                    )
+                                    Surface(
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = NeutralBackground,
+                                        border = BorderStroke(1.dp, BorderSubtle),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(10.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                modifier = Modifier.weight(1f)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.AutoMirrored.Filled.ReceiptLong,
+                                                    contentDescription = null,
+                                                    tint = ForestGreen,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Column {
+                                                    Text(
+                                                        text = "${order.itemCount} ${strings.productsWord} • $methodLabel",
+                                                        style = MaterialTheme.typography.titleSmall,
+                                                        color = TextPrimary
+                                                    )
+                                                    Text(
+                                                        text = locDisplay,
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = TextSecondary
+                                                    )
+                                                }
+                                            }
                                             Text(
-                                                text = "${order.itemCount} منتجات • ${order.paymentMethod}",
+                                                text = strings.formatPrice(order.totalUsd),
                                                 style = MaterialTheme.typography.titleSmall,
-                                                color = TextPrimary
-                                            )
-                                            Text(
-                                                text = order.deliveryLocation,
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = TextSecondary
+                                                color = ForestGreen,
+                                                fontWeight = FontWeight.Bold
                                             )
                                         }
                                     }
-                                    Text(
-                                        text = "${order.totalUsd.toInt()}$",
-                                        style = MaterialTheme.typography.titleSmall,
-                                        color = ForestGreen,
-                                        fontWeight = FontWeight.Bold
-                                    )
                                 }
                             }
                         }
@@ -429,7 +465,7 @@ fun ProfileScreen(
             },
             confirmButton = {
                 TextButton(onClick = { showHelpOrdersDialog = false }) {
-                    Text("إغلاق", color = ForestGreen, fontWeight = FontWeight.Bold)
+                    Text(strings.close, color = ForestGreen, fontWeight = FontWeight.Bold)
                 }
             }
         )
@@ -441,7 +477,7 @@ fun ProfileScreen(
             containerColor = PureWhite,
             title = {
                 Text(
-                    text = "رابط التطبيق",
+                    text = strings.appLinkTitle,
                     style = MaterialTheme.typography.titleLarge,
                     color = TextPrimary
                 )
@@ -449,7 +485,7 @@ fun ProfileScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        text = "يمكنك فتح معاينة التطبيق عبر الرابط التالي، ولتحميل ملف APK مباشرة افتح قائمة الإعدادات (Settings) في المنصة واختر تصدير أو إنشاء APK:",
+                        text = strings.appLinkDesc,
                         style = MaterialTheme.typography.bodyMedium,
                         color = TextSecondary
                     )
@@ -476,7 +512,7 @@ fun ProfileScreen(
                             onClick = {
                                 val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                                 clipboard.setPrimaryClip(ClipData.newPlainText("App URL", appShareUrl))
-                                Toast.makeText(context, "تم نسخ الرابط", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, strings.copiedToast, Toast.LENGTH_SHORT).show()
                             },
                             shape = RoundedCornerShape(12.dp),
                             border = BorderStroke(1.dp, ForestGreen),
@@ -489,7 +525,7 @@ fun ProfileScreen(
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("نسخ", color = ForestGreen)
+                            Text(strings.copy, color = ForestGreen)
                         }
                         Button(
                             onClick = {
@@ -507,17 +543,17 @@ fun ProfileScreen(
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("فتح", color = PureWhite)
+                            Text(strings.open, color = PureWhite)
                         }
                     }
                     OutlinedButton(
                         onClick = {
                             val shareIntent = Intent(Intent.ACTION_SEND).apply {
                                 type = "text/plain"
-                                putExtra(Intent.EXTRA_TEXT, "تطبيق صيدليتي:\n$appShareUrl")
+                                putExtra(Intent.EXTRA_TEXT, "${strings.appName}:\n$appShareUrl")
                             }
                             runCatching {
-                                context.startActivity(Intent.createChooser(shareIntent, "مشاركة رابط التطبيق"))
+                                context.startActivity(Intent.createChooser(shareIntent, strings.shareChooserTitle))
                             }
                         },
                         shape = RoundedCornerShape(12.dp),
@@ -531,13 +567,13 @@ fun ProfileScreen(
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("مشاركة الرابط", color = ForestGreen)
+                        Text(strings.share, color = ForestGreen)
                     }
                 }
             },
             confirmButton = {
                 TextButton(onClick = { showAppLinkDialog = false }) {
-                    Text("إغلاق", color = ForestGreen, fontWeight = FontWeight.Bold)
+                    Text(strings.close, color = ForestGreen, fontWeight = FontWeight.Bold)
                 }
             }
         )
@@ -549,14 +585,14 @@ fun ProfileScreen(
             containerColor = PureWhite,
             title = {
                 Text(
-                    text = "حول تطبيق صيدليتي",
+                    text = strings.aboutTitle,
                     style = MaterialTheme.typography.titleLarge,
                     color = TextPrimary
                 )
             },
             text = {
                 Text(
-                    text = "تطبيق صيدليتي يوفر لك طلب الأدوية ومنتجات العناية والتواصل المباشر مع أقرب الصيدليات المعتمدة مع توصيل سريع خلال 30 دقيقة.",
+                    text = strings.aboutBody,
                     style = MaterialTheme.typography.bodyMedium,
                     color = TextSecondary,
                     textAlign = TextAlign.Start
@@ -564,7 +600,7 @@ fun ProfileScreen(
             },
             confirmButton = {
                 TextButton(onClick = { showAboutDialog = false }) {
-                    Text("تم", color = ForestGreen, fontWeight = FontWeight.Bold)
+                    Text(strings.done, color = ForestGreen, fontWeight = FontWeight.Bold)
                 }
             }
         )

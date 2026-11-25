@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -26,6 +27,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ShoppingBag
@@ -36,6 +38,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -49,27 +52,39 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.data.catalog.PharmacyCatalog
+import com.example.data.model.FavoriteItem
+import com.example.data.model.NotificationTarget
 import com.example.data.model.Pharmacy
+import com.example.data.model.PharmacySchedule
+import com.example.data.model.PharmacyScheduleFilter
 import com.example.data.model.Product
 import com.example.data.model.RecentSearch
 import com.example.ui.components.BackCircleButton
 import com.example.ui.components.CategoryCircleItem
+import com.example.ui.components.ErrorStateCard
 import com.example.ui.components.HeaderCircleIconButton
+import com.example.ui.components.LoadingStateCard
 import com.example.ui.components.PharmacyListCard
+import com.example.ui.components.PharmacyScheduleFilterRow
 import com.example.ui.components.ProductCard
 import com.example.ui.components.SectionHeaderRow
 import com.example.ui.theme.BorderSubtle
 import com.example.ui.theme.ForestGreen
+import com.example.ui.theme.LocalAppStrings
 import com.example.ui.theme.MintSoft
 import com.example.ui.theme.MintTeal
 import com.example.ui.theme.NeutralBackground
 import com.example.ui.theme.PureWhite
+import com.example.ui.theme.StatusDutyAmber
+import com.example.ui.theme.StatusDutyBg
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
+import com.example.viewmodel.UiState
 
 @Composable
 fun SearchProductsScreen(
-    recentSearches: List<RecentSearch>,
+    initialCategoryId: String,
+    recentSearchesState: UiState<List<RecentSearch>>,
     favoriteProductIds: Set<String>,
     cartCount: Int,
     onBack: () -> Unit,
@@ -79,31 +94,43 @@ fun SearchProductsScreen(
     onToggleFavorite: (Product, Boolean) -> Unit,
     onSubmitSearch: (String) -> Unit,
     onDeleteRecentSearch: (String) -> Unit,
+    onRetry: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val strings = LocalAppStrings.current
     var query by remember { mutableStateOf("") }
-    var selectedCategoryId by remember { mutableStateOf("all") }
+    var selectedCategoryId by remember(initialCategoryId) { mutableStateOf(initialCategoryId) }
+
+    val recentSearches = (recentSearchesState as? UiState.Success)?.data ?: emptyList()
 
     val filteredProducts = remember(query, selectedCategoryId) {
+        val trimmed = query.trim()
         PharmacyCatalog.products.filter { prod ->
             val catMatch = selectedCategoryId == "all" || prod.categoryId == selectedCategoryId
-            val textMatch = query.isBlank() ||
-                prod.nameAr.contains(query.trim(), ignoreCase = true) ||
-                prod.subtitleAr.contains(query.trim(), ignoreCase = true) ||
-                prod.categoryAr.contains(query.trim(), ignoreCase = true)
+            val textMatch = trimmed.isBlank() ||
+                prod.nameAr.contains(trimmed, ignoreCase = true) ||
+                prod.nameEn.contains(trimmed, ignoreCase = true) ||
+                prod.subtitleAr.contains(trimmed, ignoreCase = true) ||
+                prod.subtitleEn.contains(trimmed, ignoreCase = true) ||
+                prod.categoryAr.contains(trimmed, ignoreCase = true) ||
+                prod.categoryEn.contains(trimmed, ignoreCase = true)
             catMatch && textMatch
         }
     }
 
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .background(NeutralBackground),
         contentAlignment = Alignment.TopCenter
     ) {
+        val isWide = maxWidth >= 600.dp
+        val maxContentWidth = if (isWide) 860.dp else 600.dp
+        val columns = if (isWide) 3 else 2
+
         LazyColumn(
             modifier = Modifier
-                .widthIn(max = 600.dp)
+                .widthIn(max = maxContentWidth)
                 .fillMaxSize(),
             contentPadding = PaddingValues(top = 12.dp, bottom = 28.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -119,18 +146,18 @@ fun SearchProductsScreen(
                 ) {
                     BackCircleButton(onClick = onBack)
                     Text(
-                        text = "المنتجات",
+                        text = strings.productsTitle,
                         style = MaterialTheme.typography.headlineSmall,
                         color = TextPrimary
                     )
                     HeaderCircleIconButton(
                         onClick = onOpenCart,
-                        contentDescription = "السلة",
+                        contentDescription = strings.cartTitle,
                         badgeCount = cartCount
                     ) {
                         Icon(
                             imageVector = Icons.Filled.ShoppingBag,
-                            contentDescription = "السلة",
+                            contentDescription = strings.cartTitle,
                             tint = ForestGreen,
                             modifier = Modifier.size(20.dp)
                         )
@@ -144,7 +171,7 @@ fun SearchProductsScreen(
                     onValueChange = { query = it },
                     placeholder = {
                         Text(
-                            text = "أبحث عن دواء أو صيدلية....",
+                            text = strings.searchProductsOrPharmacies,
                             style = MaterialTheme.typography.bodyMedium,
                             color = TextSecondary
                         )
@@ -154,12 +181,14 @@ fun SearchProductsScreen(
                             onClick = { onSubmitSearch(query) },
                             shape = CircleShape,
                             color = ForestGreen,
-                            modifier = Modifier.size(36.dp)
+                            modifier = Modifier
+                                .minimumInteractiveComponentSize()
+                                .size(38.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     imageVector = Icons.Filled.Search,
-                                    contentDescription = "بحث",
+                                    contentDescription = strings.searchAction,
                                     tint = PureWhite,
                                     modifier = Modifier.size(18.dp)
                                 )
@@ -183,46 +212,58 @@ fun SearchProductsScreen(
                 )
             }
 
-            if (recentSearches.isNotEmpty()) {
-                item {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        SectionHeaderRow(
-                            title = "عمليات البحث الأخيرة",
-                            actionLabel = null,
-                            modifier = Modifier.padding(horizontal = 18.dp)
+            when (recentSearchesState) {
+                is UiState.Error -> {
+                    item {
+                        ErrorStateCard(
+                            errorMessage = recentSearchesState.message,
+                            onRetry = onRetry
                         )
-                        LazyRow(
-                            contentPadding = PaddingValues(horizontal = 18.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            items(recentSearches, key = { it.id.ifBlank { it.query } }) { chip ->
-                                Surface(
-                                    onClick = { query = chip.query },
-                                    shape = RoundedCornerShape(14.dp),
-                                    color = PureWhite,
-                                    border = BorderStroke(1.dp, BorderSubtle)
+                    }
+                }
+                is UiState.Success -> {
+                    if (recentSearches.isNotEmpty()) {
+                        item {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                SectionHeaderRow(
+                                    title = strings.recentSearchesTitle,
+                                    actionLabel = null,
+                                    modifier = Modifier.padding(horizontal = 18.dp)
+                                )
+                                LazyRow(
+                                    contentPadding = PaddingValues(horizontal = 18.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp)
-                                    ) {
-                                        Text(
-                                            text = chip.query,
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = TextPrimary
-                                        )
-                                        IconButton(
-                                            onClick = {
-                                                if (chip.id.isNotBlank()) onDeleteRecentSearch(chip.id)
-                                            },
-                                            modifier = Modifier.size(28.dp)
+                                    items(recentSearches, key = { it.id.ifBlank { it.query } }) { chip ->
+                                        Surface(
+                                            onClick = { query = chip.query },
+                                            shape = RoundedCornerShape(14.dp),
+                                            color = PureWhite,
+                                            border = BorderStroke(1.dp, BorderSubtle)
                                         ) {
-                                            Icon(
-                                                imageVector = Icons.Filled.Close,
-                                                contentDescription = "حذف البحث",
-                                                tint = TextSecondary,
-                                                modifier = Modifier.size(14.dp)
-                                            )
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                modifier = Modifier.padding(start = 12.dp, end = 2.dp)
+                                            ) {
+                                                Text(
+                                                    text = chip.query,
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    color = TextPrimary
+                                                )
+                                                IconButton(
+                                                    onClick = {
+                                                        if (chip.id.isNotBlank()) onDeleteRecentSearch(chip.id)
+                                                    },
+                                                    modifier = Modifier.minimumInteractiveComponentSize()
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Filled.Close,
+                                                        contentDescription = strings.deleteSearch,
+                                                        tint = TextSecondary,
+                                                        modifier = Modifier.size(16.dp)
+                                                    )
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -230,12 +271,13 @@ fun SearchProductsScreen(
                         }
                     }
                 }
+                UiState.Loading -> Unit
             }
 
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     SectionHeaderRow(
-                        title = "الأقسام",
+                        title = strings.sections,
                         actionLabel = null,
                         modifier = Modifier.padding(horizontal = 18.dp)
                     )
@@ -256,9 +298,14 @@ fun SearchProductsScreen(
 
             item {
                 val activeCatName = PharmacyCatalog.categories
-                    .firstOrNull { it.id == selectedCategoryId }?.titleAr ?: "الأدوية"
+                    .firstOrNull { it.id == selectedCategoryId }
+                    ?.localizedTitle(strings.isEnglish) ?: strings.allProducts
                 SectionHeaderRow(
-                    title = if (selectedCategoryId == "all") "جميع المنتجات" else "قسم $activeCatName",
+                    title = if (selectedCategoryId == "all") {
+                        strings.allProducts
+                    } else {
+                        "${strings.categoryPrefix}: $activeCatName"
+                    },
                     actionLabel = null,
                     modifier = Modifier.padding(horizontal = 18.dp)
                 )
@@ -269,12 +316,13 @@ fun SearchProductsScreen(
                     Surface(
                         shape = RoundedCornerShape(20.dp),
                         color = PureWhite,
+                        border = BorderStroke(1.dp, BorderSubtle),
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 18.dp)
                     ) {
                         Text(
-                            text = "لا توجد منتجات مطابقة لبحثك حالياً.",
+                            text = strings.noMatchingProducts,
                             style = MaterialTheme.typography.bodyLarge,
                             color = TextSecondary,
                             textAlign = TextAlign.Center,
@@ -283,14 +331,14 @@ fun SearchProductsScreen(
                     }
                 }
             } else {
-                items(filteredProducts.chunked(2)) { pair ->
+                items(filteredProducts.chunked(columns)) { rowItems ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 18.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        pair.forEach { prod ->
+                        rowItems.forEach { prod ->
                             val isFav = favoriteProductIds.contains(prod.id)
                             ProductCard(
                                 product = prod,
@@ -301,7 +349,7 @@ fun SearchProductsScreen(
                                 modifier = Modifier.weight(1f)
                             )
                         }
-                        if (pair.size == 1) {
+                        repeat(columns - rowItems.size) {
                             Spacer(modifier = Modifier.weight(1f))
                         }
                     }
@@ -319,26 +367,43 @@ fun PharmaciesListScreen(
     onOpenPharmacy: (Pharmacy) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val strings = LocalAppStrings.current
     var query by remember { mutableStateOf("") }
-    val filtered = remember(query) {
-        if (query.isBlank()) PharmacyCatalog.pharmacies
-        else PharmacyCatalog.pharmacies.filter {
-            it.nameAr.contains(query.trim(), ignoreCase = true) ||
-                it.areaAr.contains(query.trim(), ignoreCase = true)
+    var selectedScheduleFilter by remember { mutableStateOf(PharmacyScheduleFilter.ALL) }
+
+    val filtered = remember(query, selectedScheduleFilter) {
+        val trimmed = query.trim()
+        PharmacyCatalog.pharmacies.filter { pharmacy ->
+            val scheduleMatch = when (selectedScheduleFilter) {
+                PharmacyScheduleFilter.ALL -> true
+                PharmacyScheduleFilter.ALWAYS_24H -> pharmacy.isAlways24h
+                PharmacyScheduleFilter.DAY_DUTY -> pharmacy.schedule == PharmacySchedule.DAY_DUTY
+            }
+            val queryMatch = trimmed.isBlank() ||
+                pharmacy.nameAr.contains(trimmed, ignoreCase = true) ||
+                pharmacy.nameEn.contains(trimmed, ignoreCase = true) ||
+                pharmacy.areaAr.contains(trimmed, ignoreCase = true) ||
+                pharmacy.areaEn.contains(trimmed, ignoreCase = true) ||
+                pharmacy.addressAr.contains(trimmed, ignoreCase = true) ||
+                pharmacy.addressEn.contains(trimmed, ignoreCase = true)
+            scheduleMatch && queryMatch
         }
     }
-    val openPharmacies = filtered.filter { it.openNow }
-    val closedPharmacies = filtered.filter { !it.openNow }
+    val always24hPharmacies = filtered.filter { it.isAlways24h }
+    val dayDutyPharmacies = filtered.filter { it.schedule == PharmacySchedule.DAY_DUTY }
 
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .background(NeutralBackground),
         contentAlignment = Alignment.TopCenter
     ) {
+        val isWide = maxWidth >= 600.dp
+        val maxContentWidth = if (isWide) 860.dp else 600.dp
+
         LazyColumn(
             modifier = Modifier
-                .widthIn(max = 600.dp)
+                .widthIn(max = maxContentWidth)
                 .fillMaxSize(),
             contentPadding = PaddingValues(top = 12.dp, bottom = 28.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
@@ -354,18 +419,18 @@ fun PharmaciesListScreen(
                 ) {
                     BackCircleButton(onClick = onBack)
                     Text(
-                        text = "الصيدليات",
+                        text = strings.pharmaciesTitle,
                         style = MaterialTheme.typography.headlineSmall,
                         color = TextPrimary
                     )
                     HeaderCircleIconButton(
                         onClick = onOpenCart,
-                        contentDescription = "السلة",
+                        contentDescription = strings.cartTitle,
                         badgeCount = cartCount
                     ) {
                         Icon(
                             imageVector = Icons.Filled.ShoppingBag,
-                            contentDescription = "السلة",
+                            contentDescription = strings.cartTitle,
                             tint = ForestGreen,
                             modifier = Modifier.size(20.dp)
                         )
@@ -379,7 +444,7 @@ fun PharmaciesListScreen(
                     onValueChange = { query = it },
                     placeholder = {
                         Text(
-                            text = "أبحث عن دواء أو صيدلية....",
+                            text = strings.searchProductsOrPharmacies,
                             style = MaterialTheme.typography.bodyMedium,
                             color = TextSecondary
                         )
@@ -393,7 +458,7 @@ fun PharmaciesListScreen(
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     imageVector = Icons.Filled.Search,
-                                    contentDescription = "بحث",
+                                    contentDescription = strings.searchAction,
                                     tint = PureWhite,
                                     modifier = Modifier.size(18.dp)
                                 )
@@ -414,37 +479,135 @@ fun PharmaciesListScreen(
                 )
             }
 
-            if (openPharmacies.isNotEmpty()) {
-                item {
-                    SectionHeaderRow(
-                        title = "الصيدليات القريبة منك",
-                        actionLabel = null,
-                        modifier = Modifier.padding(horizontal = 18.dp)
-                    )
-                }
-                items(openPharmacies, key = { it.id }) { pharmacy ->
-                    PharmacyListCard(
-                        pharmacy = pharmacy,
-                        onClick = { onOpenPharmacy(pharmacy) },
-                        modifier = Modifier.padding(horizontal = 18.dp)
-                    )
+            item {
+                PharmacyScheduleFilterRow(
+                    selected = selectedScheduleFilter,
+                    onSelect = { selectedScheduleFilter = it }
+                )
+            }
+
+            item {
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = StatusDutyBg.copy(alpha = 0.72f),
+                    border = BorderStroke(1.dp, StatusDutyAmber.copy(alpha = 0.3f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 18.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Info,
+                            contentDescription = null,
+                            tint = StatusDutyAmber,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Text(
+                            text = strings.gardeAdvisory,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextPrimary,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
             }
 
-            if (closedPharmacies.isNotEmpty()) {
+            if (filtered.isEmpty()) {
+                item {
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = PureWhite,
+                        border = BorderStroke(1.dp, BorderSubtle),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 18.dp)
+                    ) {
+                        Text(
+                            text = strings.noMatchingPharmacies,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = TextSecondary,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(24.dp)
+                        )
+                    }
+                }
+            }
+
+            if (always24hPharmacies.isNotEmpty()) {
                 item {
                     SectionHeaderRow(
-                        title = "الصيدليات المغلقة",
+                        title = strings.schedule24h,
                         actionLabel = null,
                         modifier = Modifier.padding(horizontal = 18.dp)
                     )
                 }
-                items(closedPharmacies, key = { it.id }) { pharmacy ->
-                    PharmacyListCard(
-                        pharmacy = pharmacy,
-                        onClick = { onOpenPharmacy(pharmacy) },
+                if (isWide) {
+                    items(always24hPharmacies.chunked(2)) { pair ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 18.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            pair.forEach { pharmacy ->
+                                PharmacyListCard(
+                                    pharmacy = pharmacy,
+                                    onClick = { onOpenPharmacy(pharmacy) },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                            if (pair.size == 1) Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                } else {
+                    items(always24hPharmacies, key = { it.id }) { pharmacy ->
+                        PharmacyListCard(
+                            pharmacy = pharmacy,
+                            onClick = { onOpenPharmacy(pharmacy) },
+                            modifier = Modifier.padding(horizontal = 18.dp)
+                        )
+                    }
+                }
+            }
+
+            if (dayDutyPharmacies.isNotEmpty()) {
+                item {
+                    SectionHeaderRow(
+                        title = strings.scheduleDayDuty,
+                        actionLabel = null,
                         modifier = Modifier.padding(horizontal = 18.dp)
                     )
+                }
+                if (isWide) {
+                    items(dayDutyPharmacies.chunked(2)) { pair ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 18.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            pair.forEach { pharmacy ->
+                                PharmacyListCard(
+                                    pharmacy = pharmacy,
+                                    onClick = { onOpenPharmacy(pharmacy) },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                            if (pair.size == 1) Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                } else {
+                    items(dayDutyPharmacies, key = { it.id }) { pharmacy ->
+                        PharmacyListCard(
+                            pharmacy = pharmacy,
+                            onClick = { onOpenPharmacy(pharmacy) },
+                            modifier = Modifier.padding(horizontal = 18.dp)
+                        )
+                    }
                 }
             }
         }
@@ -453,28 +616,40 @@ fun PharmaciesListScreen(
 
 @Composable
 fun FavoritesScreen(
-    favoriteProductIds: Set<String>,
+    favoritesState: UiState<List<FavoriteItem>>,
     onBack: () -> Unit,
     onOpenProduct: (Product) -> Unit,
     onAddToCart: (Product) -> Unit,
     onToggleFavorite: (Product, Boolean) -> Unit,
+    onRetry: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val strings = LocalAppStrings.current
+    val favoriteProductIds = remember(favoritesState) {
+        ((favoritesState as? UiState.Success)?.data ?: emptyList())
+            .map { it.productId }
+            .toSet()
+    }
     val favoriteProducts = remember(favoriteProductIds) {
         PharmacyCatalog.products.filter { favoriteProductIds.contains(it.id) }
     }
 
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .background(NeutralBackground),
         contentAlignment = Alignment.TopCenter
     ) {
+        val isWide = maxWidth >= 600.dp
+        val maxContentWidth = if (isWide) 860.dp else 600.dp
+        val columns = if (isWide) 3 else 2
+        val bottomClearance = if (isWide) 28.dp else 112.dp
+
         LazyColumn(
             modifier = Modifier
-                .widthIn(max = 600.dp)
+                .widthIn(max = maxContentWidth)
                 .fillMaxSize(),
-            contentPadding = PaddingValues(top = 12.dp, bottom = 110.dp),
+            contentPadding = PaddingValues(top = 12.dp, bottom = bottomClearance),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             item {
@@ -488,69 +663,87 @@ fun FavoritesScreen(
                 ) {
                     BackCircleButton(onClick = onBack)
                     Text(
-                        text = "المفضلة",
+                        text = strings.tabFavorites,
                         style = MaterialTheme.typography.headlineSmall,
                         color = TextPrimary
                     )
-                    Spacer(modifier = Modifier.size(44.dp))
+                    Spacer(modifier = Modifier.size(48.dp))
                 }
             }
 
-            if (favoriteProducts.isEmpty()) {
-                item {
-                    Surface(
-                        shape = RoundedCornerShape(22.dp),
-                        color = PureWhite,
-                        border = BorderStroke(1.dp, BorderSubtle),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 18.dp, vertical = 20.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(28.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Favorite,
-                                contentDescription = null,
-                                tint = MintTeal,
-                                modifier = Modifier.size(42.dp)
-                            )
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Text(
-                                text = "لا توجد منتجات في المفضلة بعد",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = TextPrimary
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "اضغط على رمز القلب لحفظ الأدوية والفيتامينات التي تحتاجها باستمرار.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = TextSecondary,
-                                textAlign = TextAlign.Center
-                            )
-                        }
+            when (favoritesState) {
+                UiState.Loading -> {
+                    item { LoadingStateCard() }
+                }
+                is UiState.Error -> {
+                    item {
+                        ErrorStateCard(
+                            errorMessage = favoritesState.message,
+                            onRetry = onRetry
+                        )
                     }
                 }
-            } else {
-                items(favoriteProducts.chunked(2)) { pair ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 18.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        pair.forEach { prod ->
-                            ProductCard(
-                                product = prod,
-                                isFavorite = true,
-                                onCardClick = { onOpenProduct(prod) },
-                                onAddClick = { onAddToCart(prod) },
-                                onToggleFavorite = { onToggleFavorite(prod, true) },
-                                modifier = Modifier.weight(1f)
-                            )
+                is UiState.Success -> {
+                    if (favoriteProducts.isEmpty()) {
+                        item {
+                            Surface(
+                                shape = RoundedCornerShape(22.dp),
+                                color = PureWhite,
+                                border = BorderStroke(1.dp, BorderSubtle),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 18.dp, vertical = 20.dp)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(28.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Favorite,
+                                        contentDescription = null,
+                                        tint = MintTeal,
+                                        modifier = Modifier.size(42.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Text(
+                                        text = strings.emptyFavoritesTitle,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = TextPrimary,
+                                        textAlign = TextAlign.Center
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = strings.emptyFavoritesBody,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = TextSecondary,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            }
                         }
-                        if (pair.size == 1) Spacer(modifier = Modifier.weight(1f))
+                    } else {
+                        items(favoriteProducts.chunked(columns)) { rowItems ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 18.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                rowItems.forEach { prod ->
+                                    ProductCard(
+                                        product = prod,
+                                        isFavorite = true,
+                                        onCardClick = { onOpenProduct(prod) },
+                                        onAddClick = { onAddToCart(prod) },
+                                        onToggleFavorite = { onToggleFavorite(prod, true) },
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                                repeat(columns - rowItems.size) {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -561,20 +754,27 @@ fun FavoritesScreen(
 @Composable
 fun NotificationsScreen(
     onBack: () -> Unit,
+    onOpenPromoVitamins: () -> Unit,
     onOpenChats: () -> Unit,
+    onOpenPharmacies: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Box(
+    val strings = LocalAppStrings.current
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .background(NeutralBackground),
         contentAlignment = Alignment.TopCenter
     ) {
+        val isWide = maxWidth >= 600.dp
+        val maxContentWidth = if (isWide) 800.dp else 600.dp
+        val bottomClearance = if (isWide) 28.dp else 112.dp
+
         LazyColumn(
             modifier = Modifier
-                .widthIn(max = 600.dp)
+                .widthIn(max = maxContentWidth)
                 .fillMaxSize(),
-            contentPadding = PaddingValues(top = 12.dp, bottom = 110.dp),
+            contentPadding = PaddingValues(top = 12.dp, bottom = bottomClearance),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
@@ -588,23 +788,30 @@ fun NotificationsScreen(
                 ) {
                     BackCircleButton(onClick = onBack)
                     Text(
-                        text = "الإشعارات",
+                        text = strings.notificationsTitle,
                         style = MaterialTheme.typography.headlineSmall,
                         color = TextPrimary
                     )
-                    Spacer(modifier = Modifier.size(44.dp))
+                    Spacer(modifier = Modifier.size(48.dp))
                 }
             }
 
             items(PharmacyCatalog.sampleNotifications, key = { it.id }) { notif ->
                 Surface(
-                    onClick = onOpenChats,
+                    onClick = {
+                        when (notif.target) {
+                            NotificationTarget.PROMO_VITAMINS -> onOpenPromoVitamins()
+                            NotificationTarget.CHATS -> onOpenChats()
+                            NotificationTarget.PHARMACIES -> onOpenPharmacies()
+                        }
+                    },
                     shape = RoundedCornerShape(20.dp),
                     color = if (notif.unread) MintSoft else PureWhite,
                     border = BorderStroke(1.dp, BorderSubtle),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 18.dp)
+                        .testTag("notification_card_${notif.id}")
                 ) {
                     Row(
                         modifier = Modifier.padding(16.dp),
@@ -631,20 +838,22 @@ fun NotificationsScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Text(
-                                    text = notif.titleAr,
+                                    text = notif.localizedTitle(strings.isEnglish),
                                     style = MaterialTheme.typography.titleSmall,
                                     color = TextPrimary,
-                                    fontWeight = FontWeight.Bold
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.weight(1f)
                                 )
+                                Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = notif.timeAr,
+                                    text = notif.localizedTime(strings.isEnglish),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = TextSecondary
                                 )
                             }
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = notif.bodyAr,
+                                text = notif.localizedBody(strings.isEnglish),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = TextSecondary
                             )

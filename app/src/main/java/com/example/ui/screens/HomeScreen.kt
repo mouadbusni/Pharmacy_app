@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -35,6 +36,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -43,22 +45,29 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.R
 import com.example.data.catalog.PharmacyCatalog
 import com.example.data.model.Pharmacy
+import com.example.data.model.PharmacySchedule
+import com.example.data.model.PharmacyScheduleFilter
 import com.example.data.model.Product
 import com.example.ui.components.CategoryCircleItem
 import com.example.ui.components.HeaderCircleIconButton
 import com.example.ui.components.PharmacyListCard
+import com.example.ui.components.PharmacyScheduleFilterRow
 import com.example.ui.components.ProductCard
 import com.example.ui.components.SectionHeaderRow
 import com.example.ui.theme.BorderSubtle
 import com.example.ui.theme.ForestGreen
+import com.example.ui.theme.LocalAppStrings
 import com.example.ui.theme.MintSoft
 import com.example.ui.theme.MintTeal
 import com.example.ui.theme.NeutralBackground
@@ -74,7 +83,7 @@ fun HomeScreen(
     favoriteProductIds: Set<String>,
     onSelectCategory: (String) -> Unit,
     onSelectLocation: (String) -> Unit,
-    onOpenSearch: () -> Unit,
+    onOpenSearch: (String) -> Unit,
     onOpenNotifications: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenProduct: (Product) -> Unit,
@@ -84,7 +93,9 @@ fun HomeScreen(
     onToggleFavorite: (Product, Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val strings = LocalAppStrings.current
     var showLocationSheet by remember { mutableStateOf(false) }
+    var selectedScheduleFilter by remember { mutableStateOf(PharmacyScheduleFilter.ALL) }
 
     val filteredProducts = remember(selectedCategoryId) {
         if (selectedCategoryId == "all") {
@@ -94,24 +105,41 @@ fun HomeScreen(
         }
     }
 
-    Box(
+    val localizedSelectedLocation = PharmacyCatalog.localizeLocation(
+        locationAr = selectedLocation,
+        isEnglish = strings.isEnglish
+    )
+
+    val filteredPharmacies = remember(selectedScheduleFilter) {
+        when (selectedScheduleFilter) {
+            PharmacyScheduleFilter.ALL -> PharmacyCatalog.pharmacies
+            PharmacyScheduleFilter.ALWAYS_24H -> PharmacyCatalog.pharmacies.filter { it.isAlways24h }
+            PharmacyScheduleFilter.DAY_DUTY -> PharmacyCatalog.pharmacies.filter { it.schedule == PharmacySchedule.DAY_DUTY }
+        }
+    }
+
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .background(NeutralBackground),
         contentAlignment = Alignment.TopCenter
     ) {
+        val isWide = maxWidth >= 600.dp
+        val maxContentWidth = if (isWide) 860.dp else 600.dp
+        val bottomClearance = if (isWide) 28.dp else 112.dp
+        val pharmaciesPreview = remember(filteredPharmacies) { filteredPharmacies.take(4) }
+
         LazyColumn(
             modifier = Modifier
-                .widthIn(max = 600.dp)
+                .widthIn(max = maxContentWidth)
                 .fillMaxSize(),
             contentPadding = PaddingValues(
                 top = 12.dp,
-                bottom = 110.dp
+                bottom = bottomClearance
             ),
             verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
             item {
-                // Top Location + Actions Bar
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -123,29 +151,33 @@ fun HomeScreen(
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
+                            .weight(1f, fill = false)
+                            .minimumInteractiveComponentSize()
                             .clip(RoundedCornerShape(14.dp))
                             .clickable { showLocationSheet = true }
-                            .padding(vertical = 4.dp, horizontal = 6.dp)
+                            .padding(vertical = 6.dp, horizontal = 6.dp)
                             .testTag("location_selector")
                     ) {
                         Icon(
                             imageVector = Icons.Filled.LocationOn,
-                            contentDescription = "الموقع",
+                            contentDescription = strings.deliverTo,
                             tint = ForestGreen,
                             modifier = Modifier.size(22.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Column {
                             Text(
-                                text = "التوصيل إلى",
+                                text = strings.deliverTo,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = TextSecondary
                             )
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
-                                    text = selectedLocation,
+                                    text = localizedSelectedLocation,
                                     style = MaterialTheme.typography.titleSmall,
-                                    color = TextPrimary
+                                    color = TextPrimary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                                 Spacer(modifier = Modifier.width(2.dp))
                                 Icon(
@@ -158,28 +190,28 @@ fun HomeScreen(
                         }
                     }
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         HeaderCircleIconButton(
                             onClick = onOpenNotifications,
-                            contentDescription = "الإشعارات",
+                            contentDescription = strings.notifications,
                             badgeCount = 2,
                             modifier = Modifier.testTag("home_notifications_button")
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.Notifications,
-                                contentDescription = "الإشعارات",
+                                contentDescription = strings.notifications,
                                 tint = ForestGreen,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
                         HeaderCircleIconButton(
                             onClick = onOpenSettings,
-                            contentDescription = "الإعدادات",
+                            contentDescription = strings.settings,
                             modifier = Modifier.testTag("home_settings_button")
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.Settings,
-                                contentDescription = "الإعدادات",
+                                contentDescription = strings.settings,
                                 tint = ForestGreen,
                                 modifier = Modifier.size(20.dp)
                             )
@@ -189,9 +221,8 @@ fun HomeScreen(
             }
 
             item {
-                // Search Bar Pill
                 Surface(
-                    onClick = onOpenSearch,
+                    onClick = { onOpenSearch("all") },
                     shape = RoundedCornerShape(18.dp),
                     color = PureWhite,
                     shadowElevation = 2.dp,
@@ -210,10 +241,14 @@ fun HomeScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = "أبحث عن دواء أو صيدلية....",
+                            text = strings.searchPlaceholder,
                             style = MaterialTheme.typography.bodyMedium,
                             color = TextSecondary,
-                            modifier = Modifier.padding(horizontal = 8.dp)
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(horizontal = 8.dp)
                         )
                         Surface(
                             shape = CircleShape,
@@ -223,7 +258,7 @@ fun HomeScreen(
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     imageVector = Icons.Filled.Search,
-                                    contentDescription = "بحث",
+                                    contentDescription = strings.searchAction,
                                     tint = PureWhite,
                                     modifier = Modifier.size(18.dp)
                                 )
@@ -234,26 +269,39 @@ fun HomeScreen(
             }
 
             item {
-                // Promo Banner Card matching mockup
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 18.dp)
-                        .height(152.dp)
+                        .height(if (isWide) 172.dp else 156.dp)
                         .clip(RoundedCornerShape(22.dp))
-                        .clickable(onClick = onOpenSearch)
+                        .clickable { onOpenSearch("vitamins") }
                         .testTag("home_promo_banner")
                 ) {
                     Image(
                         painter = painterResource(id = R.drawable.img_promo_banner),
-                        contentDescription = "عرض خصومات 40%",
+                        contentDescription = strings.promoDiscount,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
+                    )
+                    // Subtle protective gradient behind banner text so both RTL & LTR stay legible
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.horizontalGradient(
+                                    colors = if (strings.isEnglish) {
+                                        listOf(ForestGreen.copy(alpha = 0.88f), Color.Transparent)
+                                    } else {
+                                        listOf(Color.Transparent, ForestGreen.copy(alpha = 0.82f))
+                                    }
+                                )
+                            )
                     )
                     Column(
                         modifier = Modifier
                             .align(Alignment.CenterStart)
-                            .fillMaxWidth(0.60f)
+                            .fillMaxWidth(if (isWide) 0.56f else 0.66f)
                             .fillMaxSize()
                             .padding(horizontal = 16.dp, vertical = 14.dp),
                         verticalArrangement = Arrangement.SpaceBetween,
@@ -264,7 +312,7 @@ fun HomeScreen(
                             color = MintTeal
                         ) {
                             Text(
-                                text = "خصومات 40 %",
+                                text = strings.promoDiscount,
                                 style = MaterialTheme.typography.labelMedium,
                                 color = PureWhite,
                                 fontWeight = FontWeight.Bold,
@@ -274,16 +322,20 @@ fun HomeScreen(
 
                         Column {
                             Text(
-                                text = "صحة أفضل تبدأ بعرض أفضل",
+                                text = strings.promoTitle,
                                 style = MaterialTheme.typography.titleLarge,
                                 color = PureWhite,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "وفر أكثر وأهتم بصحتك بأقل تكلفة",
+                                text = strings.promoSubtitle,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = PureWhite.copy(alpha = 0.92f)
+                                color = PureWhite.copy(alpha = 0.92f),
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
@@ -293,14 +345,13 @@ fun HomeScreen(
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     SectionHeaderRow(
-                        title = "الأصناف",
-                        actionLabel = "عرض المزيد",
-                        onActionClick = onOpenSearch,
+                        title = strings.categories,
+                        onActionClick = { onOpenSearch(selectedCategoryId) },
                         modifier = Modifier.padding(horizontal = 18.dp)
                     )
                     LazyRow(
                         contentPadding = PaddingValues(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         items(PharmacyCatalog.categories, key = { it.id }) { category ->
                             CategoryCircleItem(
@@ -316,9 +367,8 @@ fun HomeScreen(
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     SectionHeaderRow(
-                        title = "المنتجات الأكثر طلباً",
-                        actionLabel = "عرض المزيد",
-                        onActionClick = onOpenSearch,
+                        title = strings.bestSellingProducts,
+                        onActionClick = { onOpenSearch(selectedCategoryId) },
                         modifier = Modifier.padding(horizontal = 18.dp)
                     )
                     LazyRow(
@@ -333,7 +383,7 @@ fun HomeScreen(
                                 onCardClick = { onOpenProduct(product) },
                                 onAddClick = { onAddToCart(product) },
                                 onToggleFavorite = { onToggleFavorite(product, isFav) },
-                                modifier = Modifier.width(168.dp)
+                                modifier = Modifier.width(if (isWide) 182.dp else 168.dp)
                             )
                         }
                     }
@@ -341,20 +391,45 @@ fun HomeScreen(
             }
 
             item {
-                SectionHeaderRow(
-                    title = "الصيدليات الأقرب إليك",
-                    actionLabel = "عرض المزيد",
-                    onActionClick = onOpenPharmaciesList,
-                    modifier = Modifier.padding(horizontal = 18.dp)
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    SectionHeaderRow(
+                        title = strings.nearestPharmacies,
+                        onActionClick = onOpenPharmaciesList,
+                        modifier = Modifier.padding(horizontal = 18.dp)
+                    )
+                    PharmacyScheduleFilterRow(
+                        selected = selectedScheduleFilter,
+                        onSelect = { selectedScheduleFilter = it }
+                    )
+                }
             }
 
-            items(PharmacyCatalog.pharmacies.take(3), key = { it.id }) { pharmacy ->
-                PharmacyListCard(
-                    pharmacy = pharmacy,
-                    onClick = { onOpenPharmacy(pharmacy) },
-                    modifier = Modifier.padding(horizontal = 18.dp)
-                )
+            if (isWide) {
+                items(pharmaciesPreview.chunked(2)) { pair ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 18.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        pair.forEach { pharmacy ->
+                            PharmacyListCard(
+                                pharmacy = pharmacy,
+                                onClick = { onOpenPharmacy(pharmacy) },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        if (pair.size == 1) Spacer(modifier = Modifier.weight(1f))
+                    }
+                }
+            } else {
+                items(pharmaciesPreview.take(3), key = { it.id }) { pharmacy ->
+                    PharmacyListCard(
+                        pharmacy = pharmacy,
+                        onClick = { onOpenPharmacy(pharmacy) },
+                        modifier = Modifier.padding(horizontal = 18.dp)
+                    )
+                }
             }
         }
     }
@@ -370,13 +445,14 @@ fun HomeScreen(
                     .padding(horizontal = 20.dp, vertical = 12.dp)
             ) {
                 Text(
-                    text = "اختر عنوان التوصيل",
+                    text = strings.chooseDeliveryLocation,
                     style = MaterialTheme.typography.titleLarge,
                     color = TextPrimary
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 PharmacyCatalog.deliveryLocations.forEach { loc ->
                     val isSelected = loc == selectedLocation
+                    val displayLoc = PharmacyCatalog.localizeLocation(loc, strings.isEnglish)
                     Surface(
                         onClick = {
                             onSelectLocation(loc)
@@ -390,7 +466,7 @@ fun HomeScreen(
                             .padding(vertical = 4.dp)
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
@@ -400,7 +476,7 @@ fun HomeScreen(
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(
-                                text = loc,
+                                text = displayLoc,
                                 style = MaterialTheme.typography.titleSmall,
                                 color = TextPrimary
                             )

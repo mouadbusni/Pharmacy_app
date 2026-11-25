@@ -34,6 +34,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -66,8 +67,8 @@ import com.example.ui.components.BackCircleButton
 import com.example.ui.theme.BorderSubtle
 import com.example.ui.theme.ForestGreen
 import com.example.ui.theme.ForestGreenDark
+import com.example.ui.theme.LocalAppStrings
 import com.example.ui.theme.MintSoft
-import com.example.ui.theme.MintTeal
 import com.example.ui.theme.NeutralBackground
 import com.example.ui.theme.PureWhite
 import com.example.ui.theme.StatusClosedBg
@@ -81,6 +82,7 @@ fun SplashScreen(
     onAdminSkipSignIn: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val strings = LocalAppStrings.current
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -106,7 +108,7 @@ fun SplashScreen(
             ) {
                 Image(
                     painter = painterResource(id = R.drawable.img_splash_art),
-                    contentDescription = "صحتك بين يديك",
+                    contentDescription = strings.splashHeadline,
                     contentScale = ContentScale.Fit,
                     modifier = Modifier
                         .fillMaxWidth(0.86f)
@@ -128,14 +130,14 @@ fun SplashScreen(
                 Spacer(modifier = Modifier.height(20.dp))
 
                 Text(
-                    text = "صحتك بين يديك",
+                    text = strings.splashHeadline,
                     style = MaterialTheme.typography.displaySmall,
                     color = PureWhite,
                     textAlign = TextAlign.Center
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "جميع احتياجاتك الطبية في تطبيق واحد",
+                    text = strings.splashSubtitle,
                     style = MaterialTheme.typography.bodyLarge,
                     color = PureWhite.copy(alpha = 0.85f),
                     textAlign = TextAlign.Center
@@ -144,7 +146,7 @@ fun SplashScreen(
 
             Column(
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Button(
@@ -170,7 +172,7 @@ fun SplashScreen(
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
-                            text = "أبدأ الآن",
+                            text = strings.startNow,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
@@ -186,11 +188,12 @@ fun SplashScreen(
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
+                        .minimumInteractiveComponentSize()
                         .height(48.dp)
                         .testTag("splash_admin_skip_button")
                 ) {
                     Text(
-                        text = "دخول المسؤول (تخطي تسجيل الدخول)",
+                        text = strings.adminSkipSplash,
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold
                     )
@@ -207,6 +210,7 @@ fun LoginScreen(
     onAdminSkipSignIn: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val strings = LocalAppStrings.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val credentialManager = remember(context) { CredentialManager.create(context) }
@@ -236,7 +240,6 @@ fun LoginScreen(
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
         ) {
-            // Curved Dark Forest Green Wave Header matching mockup
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -281,7 +284,7 @@ fun LoginScreen(
                             Box(contentAlignment = Alignment.Center) {
                                 Image(
                                     painter = painterResource(id = R.drawable.ic_launcher_art),
-                                    contentDescription = "شعار صيدليتي",
+                                    contentDescription = strings.appName,
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier
                                         .fillMaxSize()
@@ -292,7 +295,7 @@ fun LoginScreen(
                         }
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
-                            text = "تسجيل الدخول",
+                            text = strings.loginTitle,
                             style = MaterialTheme.typography.headlineMedium,
                             color = PureWhite
                         )
@@ -307,14 +310,14 @@ fun LoginScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "مرحباً بك في صيدليتي",
+                    text = strings.loginWelcome,
                     style = MaterialTheme.typography.titleLarge,
                     color = TextPrimary,
                     textAlign = TextAlign.Center
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "سجّل الدخول بحساب Google لحفظ سلة المشتريات والمفضلة والمحادثات المباشرة مع الصيدليات.",
+                    text = strings.loginSubtitle,
                     style = MaterialTheme.typography.bodyLarge,
                     color = TextSecondary,
                     textAlign = TextAlign.Center
@@ -322,7 +325,6 @@ fun LoginScreen(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Security / Sync highlights card
                 Surface(
                     shape = RoundedCornerShape(20.dp),
                     color = NeutralBackground,
@@ -350,7 +352,7 @@ fun LoginScreen(
                             }
                             Spacer(modifier = Modifier.width(12.dp))
                             Text(
-                                text = "مزامنة فورية للطلبات والدردشات",
+                                text = strings.syncFeatureTitle,
                                 style = MaterialTheme.typography.titleSmall,
                                 color = TextPrimary
                             )
@@ -372,7 +374,7 @@ fun LoginScreen(
                             }
                             Spacer(modifier = Modifier.width(12.dp))
                             Text(
-                                text = "مصادقة آمنة عبر Google Credential Manager",
+                                text = strings.securityFeatureTitle,
                                 style = MaterialTheme.typography.titleSmall,
                                 color = TextPrimary
                             )
@@ -439,14 +441,14 @@ fun LoginScreen(
                         )
                     } else {
                         Text(
-                            text = "تسجيل الدخول عبر Google",
+                            text = strings.signInGoogle,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 OutlinedButton(
                     onClick = {
@@ -495,11 +497,12 @@ fun LoginScreen(
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
+                        .minimumInteractiveComponentSize()
                         .height(50.dp)
                         .testTag("login_admin_skip_button")
                 ) {
                     Text(
-                        text = "تخطي تسجيل الدخول (وضع المسؤول)",
+                        text = strings.skipSignInAdmin,
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold
                     )
@@ -507,7 +510,7 @@ fun LoginScreen(
 
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = "بالمتابعة أنت توافق على سياسة الخصوصية وشروط الخدمة",
+                    text = strings.termsDisclaimer,
                     style = MaterialTheme.typography.bodySmall,
                     color = TextSecondary,
                     textAlign = TextAlign.Center

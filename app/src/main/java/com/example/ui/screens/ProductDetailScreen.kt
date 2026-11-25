@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -24,22 +25,24 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.StarHalf
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Restaurant
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -62,11 +65,17 @@ import com.example.ui.components.ProductPackageArt
 import com.example.ui.components.SectionHeaderRow
 import com.example.ui.theme.BorderSubtle
 import com.example.ui.theme.ForestGreen
+import com.example.ui.theme.LocalAppStrings
 import com.example.ui.theme.MintSoft
 import com.example.ui.theme.MintTeal
 import com.example.ui.theme.NeutralBackground
 import com.example.ui.theme.PureWhite
+import com.example.ui.theme.StatusClosedBg
 import com.example.ui.theme.StatusClosedRed
+import com.example.ui.theme.StatusDutyAmber
+import com.example.ui.theme.StatusDutyBg
+import com.example.ui.theme.StatusOpenBg
+import com.example.ui.theme.StatusOpenGreen
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 import com.example.ui.theme.WarmGold
@@ -82,29 +91,31 @@ fun ProductDetailScreen(
     onToggleFavorite: (Product, Boolean) -> Unit,
     onAddToCart: (Product, Int) -> Unit,
     onOpenProduct: (Product) -> Unit,
-    onOpenSearch: () -> Unit,
+    onOpenSearch: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var quantity by remember(product.id) { mutableIntStateOf(2) }
+    val strings = LocalAppStrings.current
+    var quantity by remember(product.id) { mutableIntStateOf(1) }
     val relatedProducts = remember(product.id) {
         PharmacyCatalog.products.filter { it.id != product.id }.take(4)
     }
 
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .background(PureWhite),
         contentAlignment = Alignment.TopCenter
     ) {
+        val maxContentWidth = if (maxWidth >= 600.dp) 760.dp else 600.dp
+
         LazyColumn(
             modifier = Modifier
-                .widthIn(max = 600.dp)
+                .widthIn(max = maxContentWidth)
                 .fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 116.dp),
+            contentPadding = PaddingValues(bottom = 124.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item {
-                // Top Bar + Hero Product Visual
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -119,28 +130,28 @@ fun ProductDetailScreen(
                     ) {
                         BackCircleButton(onClick = onBack)
 
-                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             HeaderCircleIconButton(
                                 onClick = { onToggleFavorite(product, isFavorite) },
-                                contentDescription = "المفضلة",
+                                contentDescription = if (isFavorite) strings.removeFavorite else strings.addFavorite,
                                 modifier = Modifier.testTag("detail_favorite_button")
                             ) {
                                 Icon(
                                     imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                                    contentDescription = "المفضلة",
+                                    contentDescription = if (isFavorite) strings.removeFavorite else strings.addFavorite,
                                     tint = if (isFavorite) StatusClosedRed else ForestGreen,
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
                             HeaderCircleIconButton(
                                 onClick = onOpenCart,
-                                contentDescription = "السلة",
+                                contentDescription = strings.cartTitle,
                                 badgeCount = cartCount,
                                 modifier = Modifier.testTag("detail_cart_button")
                             ) {
                                 Icon(
                                     imageVector = Icons.Filled.ShoppingBag,
-                                    contentDescription = "السلة",
+                                    contentDescription = strings.cartTitle,
                                     tint = ForestGreen,
                                     modifier = Modifier.size(20.dp)
                                 )
@@ -159,7 +170,7 @@ fun ProductDetailScreen(
                         ProductPackageArt(
                             product = product,
                             modifier = Modifier
-                                .fillMaxWidth(0.76f)
+                                .fillMaxWidth(0.84f)
                                 .height(220.dp)
                         )
                         if (product.isBestSeller) {
@@ -170,7 +181,7 @@ fun ProductDetailScreen(
                                 modifier = Modifier.align(Alignment.TopEnd)
                             ) {
                                 Text(
-                                    text = "الأكثر مبيعاً",
+                                    text = strings.bestSellerBadge,
                                     style = MaterialTheme.typography.labelMedium,
                                     color = TextPrimary,
                                     fontWeight = FontWeight.Bold,
@@ -184,17 +195,39 @@ fun ProductDetailScreen(
 
             item {
                 Column(modifier = Modifier.padding(horizontal = 18.dp)) {
-                    Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = MintSoft
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = product.deliveryTimeAr,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = ForestGreen,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                        )
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MintSoft
+                        ) {
+                            Text(
+                                text = product.localizedDeliveryTime(strings.isEnglish),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = ForestGreen,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                            )
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (product.requiresPrescription) StatusClosedBg else StatusOpenBg,
+                            border = BorderStroke(
+                                1.dp,
+                                if (product.requiresPrescription) StatusClosedRed.copy(alpha = 0.35f) else StatusOpenGreen.copy(alpha = 0.35f)
+                            ),
+                            modifier = Modifier.testTag("detail_prescription_badge")
+                        ) {
+                            Text(
+                                text = if (product.requiresPrescription) strings.prescriptionRequiredLabel else strings.otcLabel,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = if (product.requiresPrescription) StatusClosedRed else StatusOpenGreen,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                            )
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(10.dp))
@@ -206,18 +239,19 @@ fun ProductDetailScreen(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = product.nameAr,
+                                text = product.localizedName(strings.isEnglish),
                                 style = MaterialTheme.typography.headlineSmall,
                                 color = TextPrimary
                             )
                             Text(
-                                text = "نبذة عن المنتج",
+                                text = strings.aboutProduct,
                                 style = MaterialTheme.typography.titleMedium,
                                 color = ForestGreen
                             )
                         }
+                        Spacer(modifier = Modifier.width(12.dp))
                         Text(
-                            text = "${product.priceUsd.toInt()}$",
+                            text = strings.formatPrice(product.priceUsd),
                             style = MaterialTheme.typography.headlineMedium,
                             color = TextPrimary,
                             fontWeight = FontWeight.Bold
@@ -227,7 +261,7 @@ fun ProductDetailScreen(
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Text(
-                        text = product.descriptionAr,
+                        text = product.localizedDescription(strings.isEnglish),
                         style = MaterialTheme.typography.bodyLarge,
                         color = TextSecondary
                     )
@@ -235,7 +269,6 @@ fun ProductDetailScreen(
             }
 
             item {
-                // Reviews Card ("50 تقييم" + golden stars + overlapping avatars)
                 Surface(
                     shape = RoundedCornerShape(20.dp),
                     color = NeutralBackground,
@@ -253,27 +286,12 @@ fun ProductDetailScreen(
                     ) {
                         Column {
                             Text(
-                                text = "${product.reviewCount} تقييم",
+                                text = "${product.reviewCount} ${strings.reviewsSuffix} • ${product.rating}",
                                 style = MaterialTheme.typography.titleMedium,
                                 color = TextPrimary
                             )
                             Spacer(modifier = Modifier.height(4.dp))
-                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                repeat(4) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Star,
-                                        contentDescription = null,
-                                        tint = WarmGold,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                }
-                                Icon(
-                                    imageVector = Icons.Filled.Star,
-                                    contentDescription = null,
-                                    tint = BorderSubtle,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
+                            DynamicStarRow(rating = product.rating)
                         }
 
                         Row(horizontalArrangement = Arrangement.spacedBy((-10).dp)) {
@@ -283,7 +301,11 @@ fun ProductDetailScreen(
                                 Color(0xFF5D3A8E),
                                 Color(0xFF00402E)
                             )
-                            val letters = listOf("ن", "س", "م", "ع")
+                            val letters = if (strings.isEnglish) {
+                                listOf("N", "S", "M", "A")
+                            } else {
+                                listOf("ن", "س", "م", "ع")
+                            }
                             colors.forEachIndexed { idx, bg ->
                                 Box(
                                     modifier = Modifier
@@ -312,7 +334,7 @@ fun ProductDetailScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     SectionHeaderRow(
-                        title = "الجرعة وطريقة الاستخدام",
+                        title = strings.dosageUsageTitle,
                         actionLabel = null
                     )
                     Row(
@@ -338,7 +360,7 @@ fun ProductDetailScreen(
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = product.dosageMorningEvening,
+                                    text = product.localizedDosageTime(strings.isEnglish),
                                     style = MaterialTheme.typography.titleSmall,
                                     color = TextPrimary
                                 )
@@ -363,7 +385,7 @@ fun ProductDetailScreen(
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = product.dosageMealTiming,
+                                    text = product.localizedMealTiming(strings.isEnglish),
                                     style = MaterialTheme.typography.titleSmall,
                                     color = TextPrimary
                                 )
@@ -374,11 +396,50 @@ fun ProductDetailScreen(
             }
 
             item {
+                val noteBg = if (product.requiresPrescription) StatusClosedBg.copy(alpha = 0.7f) else StatusDutyBg.copy(alpha = 0.65f)
+                val noteAccent = if (product.requiresPrescription) StatusClosedRed else StatusDutyAmber
+                Surface(
+                    shape = RoundedCornerShape(18.dp),
+                    color = noteBg,
+                    border = BorderStroke(1.dp, noteAccent.copy(alpha = 0.3f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 18.dp)
+                        .testTag("pharmacist_safety_note_card")
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.Top,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (product.requiresPrescription) Icons.Filled.Info else Icons.Filled.VerifiedUser,
+                            contentDescription = strings.pharmacistSafetyNoteTitle,
+                            tint = noteAccent,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(
+                                text = strings.pharmacistSafetyNoteTitle,
+                                style = MaterialTheme.typography.titleSmall,
+                                color = noteAccent,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = product.localizedSafetyNote(strings.isEnglish),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = TextPrimary
+                            )
+                        }
+                    }
+                }
+            }
+
+            item {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     SectionHeaderRow(
-                        title = "المنتجات الأكثر طلباً",
-                        actionLabel = "عرض المزيد",
-                        onActionClick = onOpenSearch,
+                        title = strings.bestSellingProducts,
+                        onActionClick = { onOpenSearch(product.categoryId) },
                         modifier = Modifier.padding(horizontal = 18.dp)
                     )
                     LazyRow(
@@ -393,7 +454,7 @@ fun ProductDetailScreen(
                                 onCardClick = { onOpenProduct(related) },
                                 onAddClick = { onAddToCart(related, 1) },
                                 onToggleFavorite = { onToggleFavorite(related, relFav) },
-                                modifier = Modifier.width(160.dp)
+                                modifier = Modifier.width(164.dp)
                             )
                         }
                     }
@@ -401,14 +462,13 @@ fun ProductDetailScreen(
             }
         }
 
-        // Bottom Sticky CTA + Quantity Counter (+ 2 -)
         Surface(
             color = PureWhite,
             shadowElevation = 12.dp,
             border = BorderStroke(1.dp, BorderSubtle),
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .widthIn(max = 600.dp)
+                .widthIn(max = maxContentWidth)
                 .fillMaxWidth()
         ) {
             Row(
@@ -416,51 +476,61 @@ fun ProductDetailScreen(
                     .navigationBarsPadding()
                     .padding(horizontal = 18.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Quantity Stepper (+ 2 -)
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Surface(
-                        onClick = { if (quantity < 99) quantity++ },
-                        shape = CircleShape,
-                        color = ForestGreen,
-                        modifier = Modifier
-                            .size(40.dp)
-                            .testTag("detail_qty_plus")
+                    Box(
+                        modifier = Modifier.minimumInteractiveComponentSize(),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Filled.Add,
-                                contentDescription = "زيادة الكمية",
-                                tint = PureWhite,
-                                modifier = Modifier.size(18.dp)
-                            )
+                        Surface(
+                            onClick = { if (quantity < 99) quantity++ },
+                            shape = CircleShape,
+                            color = ForestGreen,
+                            modifier = Modifier
+                                .size(40.dp)
+                                .testTag("detail_qty_plus")
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Filled.Add,
+                                    contentDescription = strings.increaseQty,
+                                    tint = PureWhite,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
                         }
                     }
                     Text(
                         text = quantity.toString(),
                         style = MaterialTheme.typography.titleLarge,
-                        color = TextPrimary
+                        color = TextPrimary,
+                        modifier = Modifier.padding(horizontal = 4.dp)
                     )
-                    Surface(
-                        onClick = { if (quantity > 1) quantity-- },
-                        shape = CircleShape,
-                        color = NeutralBackground,
-                        border = BorderStroke(1.dp, BorderSubtle),
-                        modifier = Modifier
-                            .size(40.dp)
-                            .testTag("detail_qty_minus")
+                    Box(
+                        modifier = Modifier.minimumInteractiveComponentSize(),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Filled.Remove,
-                                contentDescription = "إنقاص الكمية",
-                                tint = ForestGreen,
-                                modifier = Modifier.size(18.dp)
-                            )
+                        Surface(
+                            onClick = { if (quantity > 1) quantity-- },
+                            shape = CircleShape,
+                            color = NeutralBackground,
+                            border = BorderStroke(1.dp, BorderSubtle),
+                            modifier = Modifier
+                                .size(40.dp)
+                                .testTag("detail_qty_minus")
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Filled.Remove,
+                                    contentDescription = strings.decreaseQty,
+                                    tint = ForestGreen,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -484,9 +554,45 @@ fun ProductDetailScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "أضف الى السلة",
+                        text = strings.addToCartCta,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DynamicStarRow(rating: Double) {
+    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        for (i in 1..5) {
+            val thresholdFull = i.toDouble()
+            val thresholdHalf = i - 0.5
+            when {
+                rating >= thresholdFull -> {
+                    Icon(
+                        imageVector = Icons.Filled.Star,
+                        contentDescription = null,
+                        tint = WarmGold,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                rating >= thresholdHalf -> {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.StarHalf,
+                        contentDescription = null,
+                        tint = WarmGold,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                else -> {
+                    Icon(
+                        imageVector = Icons.Filled.Star,
+                        contentDescription = null,
+                        tint = BorderSubtle,
+                        modifier = Modifier.size(18.dp)
                     )
                 }
             }

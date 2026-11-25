@@ -7,6 +7,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -27,6 +28,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.automirrored.filled.StarHalf
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.ShoppingBag
@@ -37,6 +39,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -44,7 +47,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -52,6 +54,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.R
 import com.example.data.catalog.PharmacyCatalog
@@ -63,13 +66,16 @@ import com.example.ui.components.HeaderCircleIconButton
 import com.example.ui.components.PharmacyAvatarBadge
 import com.example.ui.components.ProductCard
 import com.example.ui.components.SectionHeaderRow
+import com.example.ui.theme.BorderSubtle
 import com.example.ui.theme.ForestGreen
 import com.example.ui.theme.ForestGreenLight
+import com.example.ui.theme.LocalAppStrings
 import com.example.ui.theme.NeutralBackground
 import com.example.ui.theme.PureWhite
 import com.example.ui.theme.StatusClosedBg
 import com.example.ui.theme.StatusClosedRed
-import com.example.ui.theme.StatusOpenGreen
+import com.example.ui.theme.StatusDutyAmber
+import com.example.ui.theme.StatusDutyBg
 import com.example.ui.theme.WarmGold
 
 @Composable
@@ -82,11 +88,12 @@ fun PharmacyProfileScreen(
     onOpenChat: (Pharmacy) -> Unit,
     onOpenChatsList: () -> Unit,
     onOpenProduct: (Product) -> Unit,
-    onOpenSearch: () -> Unit,
+    onOpenSearch: (String) -> Unit,
     onAddToCart: (Product) -> Unit,
     onToggleFavorite: (Product, Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val strings = LocalAppStrings.current
     val context = LocalContext.current
     var selectedCategory by remember { mutableStateOf("all") }
 
@@ -95,25 +102,28 @@ fun PharmacyProfileScreen(
         else PharmacyCatalog.products.filter { it.categoryId == selectedCategory }
     }
 
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .background(NeutralBackground),
         contentAlignment = Alignment.TopCenter
     ) {
+        val isWide = maxWidth >= 600.dp
+        val maxContentWidth = if (isWide) 860.dp else 600.dp
+        val columns = if (isWide) 3 else 2
+
         LazyColumn(
             modifier = Modifier
-                .widthIn(max = 600.dp)
+                .widthIn(max = maxContentWidth)
                 .fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 104.dp),
+            contentPadding = PaddingValues(bottom = 116.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item {
-                // Storefront Hero + Overlapping Dark Forest Green Pharmacy Header Card
                 Box(modifier = Modifier.fillMaxWidth()) {
                     Image(
                         painter = painterResource(id = R.drawable.img_pharmacy_storefront),
-                        contentDescription = pharmacy.nameAr,
+                        contentDescription = pharmacy.localizedName(strings.isEnglish),
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -144,19 +154,18 @@ fun PharmacyProfileScreen(
                         BackCircleButton(onClick = onBack)
                         HeaderCircleIconButton(
                             onClick = onOpenCart,
-                            contentDescription = "السلة",
+                            contentDescription = strings.cartTitle,
                             badgeCount = cartCount
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.ShoppingBag,
-                                contentDescription = "السلة",
+                                contentDescription = strings.cartTitle,
                                 tint = ForestGreen,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
                     }
 
-                    // Overlapping Dark Green Pharmacy Info Card
                     Surface(
                         shape = RoundedCornerShape(26.dp),
                         color = ForestGreen,
@@ -168,7 +177,7 @@ fun PharmacyProfileScreen(
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(top = 42.dp, bottom = 18.dp, start = 18.dp, end = 18.dp),
+                                .padding(top = 44.dp, bottom = 18.dp, start = 18.dp, end = 18.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Row(
@@ -176,14 +185,30 @@ fun PharmacyProfileScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
+                                val scheduleBg = when {
+                                    !pharmacy.openNow -> StatusClosedBg
+                                    pharmacy.isAlways24h -> ForestGreenLight
+                                    else -> StatusDutyBg
+                                }
+                                val scheduleFg = when {
+                                    !pharmacy.openNow -> StatusClosedRed
+                                    pharmacy.isAlways24h -> PureWhite
+                                    else -> StatusDutyAmber
+                                }
+                                val scheduleText = when {
+                                    !pharmacy.openNow -> strings.closedNow
+                                    pharmacy.isAlways24h -> strings.schedule24h
+                                    else -> strings.scheduleDayDuty
+                                }
                                 Surface(
                                     shape = RoundedCornerShape(12.dp),
-                                    color = if (pharmacy.openNow) ForestGreenLight else StatusClosedBg
+                                    color = scheduleBg
                                 ) {
                                     Text(
-                                        text = if (pharmacy.openNow) "مفتوح الآن" else "مغلق الآن",
+                                        text = scheduleText,
                                         style = MaterialTheme.typography.labelMedium,
-                                        color = if (pharmacy.openNow) PureWhite else StatusClosedRed,
+                                        color = scheduleFg,
+                                        fontWeight = FontWeight.Bold,
                                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                                     )
                                 }
@@ -195,12 +220,18 @@ fun PharmacyProfileScreen(
                                         color = PureWhite
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    repeat(2) {
+                                    for (i in 1..5) {
+                                        val icon = when {
+                                            pharmacy.rating >= i.toDouble() -> Icons.Filled.Star
+                                            pharmacy.rating >= i - 0.5 -> Icons.AutoMirrored.Filled.StarHalf
+                                            else -> Icons.Filled.Star
+                                        }
+                                        val tint = if (pharmacy.rating >= i - 0.5) WarmGold else BorderSubtle.copy(alpha = 0.4f)
                                         Icon(
-                                            imageVector = Icons.Filled.Star,
+                                            imageVector = icon,
                                             contentDescription = null,
-                                            tint = WarmGold,
-                                            modifier = Modifier.size(15.dp)
+                                            tint = tint,
+                                            modifier = Modifier.size(14.dp)
                                         )
                                     }
                                 }
@@ -209,9 +240,11 @@ fun PharmacyProfileScreen(
                             Spacer(modifier = Modifier.height(6.dp))
 
                             Text(
-                                text = pharmacy.nameAr,
+                                text = pharmacy.localizedName(strings.isEnglish),
                                 style = MaterialTheme.typography.headlineSmall,
-                                color = PureWhite
+                                color = PureWhite,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -223,17 +256,25 @@ fun PharmacyProfileScreen(
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = "${pharmacy.areaAr}  •  ${pharmacy.distanceAr}",
+                                    text = "${pharmacy.localizedArea(strings.isEnglish)}  •  ${pharmacy.localizedDistance(strings.isEnglish)}",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = PureWhite.copy(alpha = 0.85f)
+                                    color = PureWhite.copy(alpha = 0.88f)
                                 )
                             }
+                            Spacer(modifier = Modifier.height(3.dp))
+                            Text(
+                                text = "${strings.pharmacyAddressLabel}: ${pharmacy.localizedAddress(strings.isEnglish)}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = PureWhite.copy(alpha = 0.78f),
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
 
                             Spacer(modifier = Modifier.height(16.dp))
 
                             Row(
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                modifier = Modifier.fillMaxWidth(0.86f)
+                                modifier = Modifier.fillMaxWidth(0.88f)
                             ) {
                                 Surface(
                                     onClick = {
@@ -247,7 +288,8 @@ fun PharmacyProfileScreen(
                                     border = BorderStroke(1.dp, PureWhite.copy(alpha = 0.2f)),
                                     modifier = Modifier
                                         .weight(1f)
-                                        .height(44.dp)
+                                        .minimumInteractiveComponentSize()
+                                        .height(48.dp)
                                         .testTag("pharmacy_call_button")
                                 ) {
                                     Row(
@@ -256,13 +298,13 @@ fun PharmacyProfileScreen(
                                     ) {
                                         Icon(
                                             imageVector = Icons.Filled.Call,
-                                            contentDescription = "اتصل بنا",
+                                            contentDescription = strings.callUs,
                                             tint = PureWhite,
                                             modifier = Modifier.size(17.dp)
                                         )
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
-                                            text = "أتصل بنا",
+                                            text = strings.callUs,
                                             style = MaterialTheme.typography.labelLarge,
                                             color = PureWhite
                                         )
@@ -276,7 +318,8 @@ fun PharmacyProfileScreen(
                                     border = BorderStroke(1.dp, PureWhite.copy(alpha = 0.2f)),
                                     modifier = Modifier
                                         .weight(1f)
-                                        .height(44.dp)
+                                        .minimumInteractiveComponentSize()
+                                        .height(48.dp)
                                         .testTag("pharmacy_chat_button")
                                 ) {
                                     Row(
@@ -285,13 +328,13 @@ fun PharmacyProfileScreen(
                                     ) {
                                         Icon(
                                             imageVector = Icons.AutoMirrored.Filled.Chat,
-                                            contentDescription = "راسلنا",
+                                            contentDescription = strings.messageUs,
                                             tint = PureWhite,
                                             modifier = Modifier.size(17.dp)
                                         )
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
-                                            text = "راسلنا",
+                                            text = strings.messageUs,
                                             style = MaterialTheme.typography.labelLarge,
                                             color = PureWhite
                                         )
@@ -301,7 +344,6 @@ fun PharmacyProfileScreen(
                         }
                     }
 
-                    // Centered overlapping circular Pharmacy Logo
                     Box(
                         modifier = Modifier
                             .align(Alignment.TopCenter)
@@ -315,9 +357,8 @@ fun PharmacyProfileScreen(
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     SectionHeaderRow(
-                        title = "الأقسام",
-                        actionLabel = "عرض المزيد",
-                        onActionClick = onOpenSearch,
+                        title = strings.sections,
+                        onActionClick = { onOpenSearch(selectedCategory) },
                         modifier = Modifier.padding(horizontal = 18.dp)
                     )
                     LazyRow(
@@ -337,21 +378,20 @@ fun PharmacyProfileScreen(
 
             item {
                 SectionHeaderRow(
-                    title = "الأكثر مبيعاً",
-                    actionLabel = "عرض المزيد",
-                    onActionClick = onOpenSearch,
+                    title = strings.bestSellerBadge,
+                    onActionClick = { onOpenSearch(selectedCategory) },
                     modifier = Modifier.padding(horizontal = 18.dp)
                 )
             }
 
-            items(products.chunked(2)) { pair ->
+            items(products.chunked(columns)) { rowProducts ->
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 18.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    pair.forEach { prod ->
+                    rowProducts.forEach { prod ->
                         val isFav = favoriteProductIds.contains(prod.id)
                         ProductCard(
                             product = prod,
@@ -362,18 +402,17 @@ fun PharmacyProfileScreen(
                             modifier = Modifier.weight(1f)
                         )
                     }
-                    if (pair.size == 1) {
+                    repeat(columns - rowProducts.size) {
                         Spacer(modifier = Modifier.weight(1f))
                     }
                 }
             }
         }
 
-        // Bottom Sticky "محادثة الصيدليات" CTA
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .widthIn(max = 600.dp)
+                .widthIn(max = maxContentWidth)
                 .fillMaxWidth()
                 .navigationBarsPadding()
                 .padding(horizontal = 18.dp, vertical = 14.dp)
@@ -397,7 +436,7 @@ fun PharmacyProfileScreen(
                 )
                 Spacer(modifier = Modifier.width(10.dp))
                 Text(
-                    text = "محادثة الصيدليات",
+                    text = strings.chatPharmaciesCta,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )

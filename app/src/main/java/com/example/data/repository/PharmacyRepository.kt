@@ -203,10 +203,10 @@ class PharmacyRepository(
                     ).await()
                 }
 
-                // Seed initial cart showcase items totaling $100 subtotal (+ $5 delivery = $105)
-                val biosteron = PharmacyCatalog.products.first { it.id == "prod_biosteron" }
-                val utorinic = PharmacyCatalog.products.first { it.id == "prod_utorinic" }
-                listOf(biosteron to 2L, utorinic to 1L).forEach { (prod, qty) ->
+                // Seed initial cart showcase items in Moroccan Dirhams (MAD)
+                val doliprane = PharmacyCatalog.products.first { it.id == "prod_doliprane" }
+                val vitac = PharmacyCatalog.products.first { it.id == "prod_vitac" }
+                listOf(doliprane to 2L, vitac to 1L).forEach { (prod, qty) ->
                     userRef.collection("cart").document(prod.id).set(
                         mapOf(
                             "userId" to uid,
@@ -474,7 +474,7 @@ class PharmacyRepository(
             require(paymentMethod in listOf("mastercard", "visa", "cash"))
             require(cartItems.isNotEmpty())
             val subtotal = cartItems.sumOf { it.priceUsd * it.quantity }
-            val deliveryFee = 5.0
+            val deliveryFee = PharmacyCatalog.DELIVERY_FEE_MAD
             val total = subtotal + deliveryFee
             val itemCount = cartItems.sumOf { it.quantity }.coerceIn(1L, 500L)
             val cleanLoc = deliveryLocation.trim().take(160).ifBlank { "الموقع الحالي" }
