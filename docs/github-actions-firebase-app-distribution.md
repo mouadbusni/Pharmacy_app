@@ -56,7 +56,7 @@ Under **Settings → Secrets and variables → Actions → Variables**, add:
 
 | Variable | Value |
 |---|---|
-| `ANDROID_BUILD_TYPE` | `debug` or `release`, matching the certificate used by the currently installed app. Defaults to `debug` if omitted. |
+| `ANDROID_BUILD_TYPE` | Required: `debug` or `release`, matching the certificate used by the currently installed app. The workflow deliberately fails rather than guessing. |
 | `FIREBASE_TESTERS` | Comma-separated tester email addresses, including the Google account used on the phone; or leave blank and use groups. |
 | `FIREBASE_GROUPS` | Optional comma-separated Firebase App Distribution group aliases. Create the group in Firebase App Distribution first. |
 
