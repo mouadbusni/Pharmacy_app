@@ -118,6 +118,7 @@ jobs:
         env:
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          FIREBASE_APP_DISTRIBUTION_ENABLED: 'true'
         shell: bash
         run: |
           set -euo pipefail
