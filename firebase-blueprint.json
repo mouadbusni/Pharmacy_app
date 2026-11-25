@@ -1,0 +1,243 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated user app preferences",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the user"
+        },
+        "language": {
+          "type": "string",
+          "enum": ["ar", "en"],
+          "description": "Preferred app language code"
+        },
+        "notificationsEnabled": {
+          "type": "boolean",
+          "description": "Whether order and pharmacy notifications are enabled"
+        },
+        "selectedLocation": {
+          "type": "string",
+          "description": "Active delivery neighborhood or address label"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when preferences were created (FieldValue.serverTimestamp())"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when preferences were last updated (FieldValue.serverTimestamp())"
+        }
+      },
+      "required": ["userId", "language", "notificationsEnabled", "selectedLocation", "createdAt", "updatedAt"]
+    },
+    "CartItem": {
+      "title": "CartItem",
+      "description": "Medicine or care product added to the user shopping cart",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID"
+        },
+        "productId": {
+          "type": "string",
+          "description": "Catalog product identifier"
+        },
+        "productName": {
+          "type": "string",
+          "description": "Arabic product name"
+        },
+        "category": {
+          "type": "string",
+          "description": "Category label"
+        },
+        "priceUsd": {
+          "type": "number",
+          "description": "Unit price in USD"
+        },
+        "quantity": {
+          "type": "integer",
+          "description": "Selected quantity (1..99)"
+        },
+        "rating": {
+          "type": "number",
+          "description": "Product star rating"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when item was added (FieldValue.serverTimestamp())"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when quantity changed (FieldValue.serverTimestamp())"
+        }
+      },
+      "required": ["userId", "productId", "productName", "category", "priceUsd", "quantity", "rating", "createdAt", "updatedAt"]
+    },
+    "FavoriteItem": {
+      "title": "FavoriteItem",
+      "description": "User bookmarked medicine or product",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID"
+        },
+        "productId": {
+          "type": "string",
+          "description": "Catalog product identifier"
+        },
+        "productName": {
+          "type": "string",
+          "description": "Arabic product name"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when favorited (FieldValue.serverTimestamp())"
+        }
+      },
+      "required": ["userId", "productId", "productName", "createdAt"]
+    },
+    "PharmacyOrder": {
+      "title": "PharmacyOrder",
+      "description": "Confirmed pharmacy checkout order",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID"
+        },
+        "paymentMethod": {
+          "type": "string",
+          "enum": ["mastercard", "visa", "cash"],
+          "description": "Selected payment method"
+        },
+        "subtotalUsd": {
+          "type": "number",
+          "description": "Order items subtotal in USD"
+        },
+        "deliveryUsd": {
+          "type": "number",
+          "description": "Delivery fee in USD"
+        },
+        "totalUsd": {
+          "type": "number",
+          "description": "Grand total in USD"
+        },
+        "itemCount": {
+          "type": "integer",
+          "description": "Total number of units ordered"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["confirmed", "preparing", "delivering", "delivered", "cancelled"],
+          "description": "Order fulfillment status"
+        },
+        "deliveryLocation": {
+          "type": "string",
+          "description": "Delivery address label"
+        },
+        "cardLast4": {
+          "type": "string",
+          "description": "Optional last 4 digits for card payments"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when order was placed (FieldValue.serverTimestamp())"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when order status updated (FieldValue.serverTimestamp())"
+        }
+      },
+      "required": ["userId", "paymentMethod", "subtotalUsd", "deliveryUsd", "totalUsd", "itemCount", "status", "deliveryLocation", "createdAt", "updatedAt"]
+    },
+    "RecentSearch": {
+      "title": "RecentSearch",
+      "description": "User recent search query chip",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID"
+        },
+        "query": {
+          "type": "string",
+          "description": "Search keyword"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when searched (FieldValue.serverTimestamp())"
+        }
+      },
+      "required": ["userId", "query", "createdAt"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "Message in a user-to-pharmacy conversation",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID"
+        },
+        "pharmacyId": {
+          "type": "string",
+          "description": "Target pharmacy identifier"
+        },
+        "senderType": {
+          "type": "string",
+          "enum": ["USER", "PHARMACY"],
+          "description": "Who sent the message"
+        },
+        "text": {
+          "type": "string",
+          "description": "Message body text"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when message was sent (FieldValue.serverTimestamp())"
+        }
+      },
+      "required": ["userId", "pharmacyId", "senderType", "text", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Authenticated user profile and settings"
+    },
+    "/users/{userId}/cart/{productId}": {
+      "schema": { "$ref": "#/entities/CartItem" },
+      "description": "User shopping cart items"
+    },
+    "/users/{userId}/favorites/{productId}": {
+      "schema": { "$ref": "#/entities/FavoriteItem" },
+      "description": "User favorite products"
+    },
+    "/users/{userId}/orders/{orderId}": {
+      "schema": { "$ref": "#/entities/PharmacyOrder" },
+      "description": "User placed medicine delivery orders"
+    },
+    "/users/{userId}/recent_searches/{searchId}": {
+      "schema": { "$ref": "#/entities/RecentSearch" },
+      "description": "User recent search chips"
+    },
+    "/users/{userId}/chats/{pharmacyId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/ChatMessage" },
+      "description": "User live chat messages with a specific pharmacy"
+    }
+  }
+}

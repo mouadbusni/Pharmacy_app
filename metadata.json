@@ -1,0 +1,6 @@
+{
+  "name": "صيدليتي",
+  "description": "تطبيق صيدلية عربي متكامل لطلب الأدوية ومنتجات العناية والتوصيل السريع والدردشة المباشرة مع الصيدليات",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
