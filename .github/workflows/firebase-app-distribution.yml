@@ -31,6 +31,7 @@ jobs:
       ANDROID_BUILD_TYPE: ${{ github.event_name == 'workflow_dispatch' && inputs.build_type || vars.ANDROID_BUILD_TYPE || '' }}
       FIREBASE_TESTERS: ${{ vars.FIREBASE_TESTERS }}
       FIREBASE_GROUPS: ${{ vars.FIREBASE_GROUPS }}
+      FIREBASE_APP_DISTRIBUTION_ENABLED: 'true'
 
     steps:
       - name: Check out source
@@ -125,7 +126,6 @@ jobs:
         env:
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          FIREBASE_APP_DISTRIBUTION_ENABLED: 'true'
         shell: bash
         run: |
           set -euo pipefail
