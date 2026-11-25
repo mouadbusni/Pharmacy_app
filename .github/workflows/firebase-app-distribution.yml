@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 35
     env:
-      ANDROID_BUILD_TYPE: ${{ github.event_name == 'workflow_dispatch' && inputs.build_type || vars.ANDROID_BUILD_TYPE || 'debug' }}
+      ANDROID_BUILD_TYPE: ${{ github.event_name == 'workflow_dispatch' && inputs.build_type || vars.ANDROID_BUILD_TYPE || '' }}
       FIREBASE_TESTERS: ${{ vars.FIREBASE_TESTERS }}
       FIREBASE_GROUPS: ${{ vars.FIREBASE_GROUPS }}
 
