@@ -1,6 +1,7 @@
 package com.example
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -69,6 +70,7 @@ import com.example.ui.theme.SaydaliyatiTheme
 import com.example.viewmodel.PharmacyViewModel
 import com.example.viewmodel.UiState
 import com.google.firebase.Firebase
+import com.google.firebase.appdistribution.FirebaseAppDistribution
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -99,6 +101,23 @@ class MainActivity : ComponentActivity() {
             SaydaliyatiTheme {
                 AppContent()
             }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (!BuildConfig.FIREBASE_APP_DISTRIBUTION_ENABLED) return
+
+        // Firebase App Distribution shows an update prompt to signed-in testers
+        // when a newer APK has been distributed to their tester account.
+        runCatching {
+            FirebaseAppDistribution.getInstance()
+                .updateIfNewReleaseAvailable()
+                .addOnFailureListener { error ->
+                    Log.w("SaydaliyatiUpdates", "App Distribution update check failed", error)
+                }
+        }.onFailure { error ->
+            Log.w("SaydaliyatiUpdates", "App Distribution update check could not start", error)
         }
     }
 }
