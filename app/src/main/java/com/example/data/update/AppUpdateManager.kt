@@ -37,7 +37,7 @@ class UpdatePreferencesStore(private val context: Context) {
     private val dismissedTagKey = stringPreferencesKey("dismissed_release_tag")
 
     val repoSlugFlow: Flow<String> = context.updateDataStore.data.map { prefs ->
-        prefs[repoSlugKey] ?: ""
+        prefs[repoSlugKey] ?: DEFAULT_REPO_SLUG
     }
 
     val dismissedTagFlow: Flow<String> = context.updateDataStore.data.map { prefs ->
@@ -58,6 +58,7 @@ class UpdatePreferencesStore(private val context: Context) {
     }
 
     companion object {
+        const val DEFAULT_REPO_SLUG = "mouadbusni/Pharmacy_app"
         private val REPO_SLUG_REGEX = Regex("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 
         fun normalizeRepoSlug(rawInput: String): String {
@@ -188,7 +189,7 @@ object GitHubReleaseChecker {
         return Regex("\\d+").findAll(cleaned).mapNotNull { it.value.toIntOrNull() }.toList()
     }
 
-    const val GITHUB_WORKFLOW_TEMPLATE = """name: Build & Publish Release APK
+    const val GITHUB_WORKFLOW_TEMPLATE = """name: Build & Publish APK
 on:
   push:
     branches: [ main ]
@@ -198,7 +199,7 @@ permissions:
   contents: write
 
 jobs:
-  release-apk:
+  build-apk:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -209,22 +210,27 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 9.3.1
-      - name: Decode Release Keystore (optional if configured)
-        if: ${'$'}{{ secrets.SIGNING_KEYSTORE_BASE64 != '' }}
-        run: |
-          echo "${'$'}{{ secrets.SIGNING_KEYSTORE_BASE64 }}" | base64 -d > my-upload-key.jks
-      - name: Build Release APK
+      - name: Build APK
         env:
-          KEYSTORE_PATH: ${'$'}{{ github.workspace }}/my-upload-key.jks
+          SIGNING_KEYSTORE_BASE64: ${'$'}{{ secrets.SIGNING_KEYSTORE_BASE64 }}
           STORE_PASSWORD: ${'$'}{{ secrets.STORE_PASSWORD }}
           KEY_PASSWORD: ${'$'}{{ secrets.KEY_PASSWORD }}
-        run: gradle assembleRelease
+        run: |
+          if [ -n "${'$'}SIGNING_KEYSTORE_BASE64" ]; then
+            echo "${'$'}SIGNING_KEYSTORE_BASE64" | base64 -d > my-upload-key.jks
+            export KEYSTORE_PATH="${'$'}{{ github.workspace }}/my-upload-key.jks"
+            gradle :app:assembleRelease
+            cp app/build/outputs/apk/release/app-release.apk Saydaliyati-v1.0.${'$'}{{ github.run_number }}.apk
+          else
+            gradle :app:assembleDebug
+            cp app/build/outputs/apk/debug/app-debug.apk Saydaliyati-v1.0.${'$'}{{ github.run_number }}.apk
+          fi
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.${'$'}{{ github.run_number }}
           name: Saydaliyati v1.0.${'$'}{{ github.run_number }}
-          body: Automated Release APK build from commit ${'$'}{{ github.sha }}
-          files: app/build/outputs/apk/release/app-release.apk
+          body: Automated APK build from commit ${'$'}{{ github.sha }}
+          files: Saydaliyati-v1.0.${'$'}{{ github.run_number }}.apk
 """
 }

@@ -6,22 +6,23 @@
 
 ## Download APK
 
-A ready-to-install Android build is included directly in this repository:
+Download the latest Android APK from **[GitHub Releases](https://github.com/mouadbusni/Pharmacy_app/releases/latest)** (binary APKs are distributed via GitHub Releases rather than committed directly to Git history):
 
-- **APK File:** [`releases/Saydaliyati-v1.0.apk`](./releases/Saydaliyati-v1.0.apk)
+- **Releases Page:** [github.com/mouadbusni/Pharmacy_app/releases](https://github.com/mouadbusni/Pharmacy_app/releases)
 - **Version:** `1.0` (`versionCode 1`)
 - **Compatibility:** Android 7.0+ (`minSdk 24`, `targetSdk 36`)
 
 ### Installing on Your Phone
 
-1. Download [`releases/Saydaliyati-v1.0.apk`](./releases/Saydaliyati-v1.0.apk) on your Android device (or transfer it via USB).
-2. Open the `.apk` file and allow installation from your browser or file manager if prompted.
-3. Alternatively, install via ADB over USB:
+1. Open [Releases](https://github.com/mouadbusni/Pharmacy_app/releases/latest) on your Android device and download the attached `.apk` asset.
+2. Open the downloaded `.apk` file and allow installation from your browser if prompted.
+3. Alternatively, build and install locally via ADB over USB:
    ```bash
-   adb install -r releases/Saydaliyati-v1.0.apk
+   gradle :app:assembleDebug
+   adb install -r app/build/outputs/apk/debug/app-debug.apk
    ```
 
-> **Note:** If you previously installed a release-signed build with a different keystore, uninstall the existing package once before installing this debug build.
+> **Note:** If you previously installed a release-signed APK with a different keystore, uninstall the existing package once before installing a debug-signed or differently signed build.
 
 ---
 
