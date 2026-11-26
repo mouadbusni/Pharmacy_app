@@ -1,16 +1,24 @@
 package com.example
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
@@ -26,6 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -41,8 +50,11 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.data.catalog.PharmacyCatalog
+import com.example.data.model.PharmacyScheduleFilter
 import com.example.data.repository.LocalAdminPharmacyRepository
 import com.example.data.repository.PharmacyRepository
+import com.example.data.update.AppUpdateInfo
+import com.example.data.update.UpdatePreferencesStore
 import com.example.ui.auth.LoginScreen
 import com.example.ui.auth.SplashScreen
 import com.example.ui.components.BottomTab
@@ -89,6 +101,9 @@ object PharmacyRoutes {
 
     fun searchRoute(categoryId: String = "all"): String =
         "$SEARCH_PRODUCTS?category=$categoryId"
+
+    fun pharmaciesRoute(scheduleFilter: PharmacyScheduleFilter = PharmacyScheduleFilter.ALL): String =
+        "$PHARMACIES_LIST?schedule=${scheduleFilter.name}"
 }
 
 class MainActivity : ComponentActivity() {
@@ -175,24 +190,27 @@ private fun AuthenticatedPharmacyApp(
         key = currentUserId,
         factory = viewModelFactory {
             initializer {
+                val app = checkNotNull(this[APPLICATION_KEY]) {
+                    "APPLICATION_KEY missing from CreationExtras"
+                }
+                val updateStore = UpdatePreferencesStore(app.applicationContext)
                 val repo = if (isAdminMode) {
                     LocalAdminPharmacyRepository()
                 } else {
-                    val app = checkNotNull(this[APPLICATION_KEY]) {
-                        "APPLICATION_KEY missing from CreationExtras"
-                    }
                     val databaseId = app.getString(R.string.firestore_database_id)
                     val db = FirebaseFirestore.getInstance(databaseId)
                     PharmacyRepository(db)
                 }
                 PharmacyViewModel(
                     repository = repo,
-                    currentUserId = currentUserId
+                    currentUserId = currentUserId,
+                    updatePreferencesStore = updateStore
                 )
             }
         }
     )
 
+    val context = LocalContext.current
     val profileState by viewModel.profileState.collectAsStateWithLifecycle()
     val cartState by viewModel.cartState.collectAsStateWithLifecycle()
     val favoritesState by viewModel.favoritesState.collectAsStateWithLifecycle()
@@ -201,6 +219,13 @@ private fun AuthenticatedPharmacyApp(
     val selectedHomeCategory by viewModel.selectedHomeCategory.collectAsStateWithLifecycle()
     val isSubmittingOrder by viewModel.isSubmittingOrder.collectAsStateWithLifecycle()
     val actionMessage by viewModel.actionMessage.collectAsStateWithLifecycle()
+    val configuredRepo by viewModel.configuredRepo.collectAsStateWithLifecycle()
+    val appUpdateState by viewModel.appUpdateState.collectAsStateWithLifecycle()
+
+    val onLaunchUpdateDownload: (AppUpdateInfo) -> Unit = { info ->
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(info.apkDownloadUrl))
+        runCatching { context.startActivity(intent) }
+    }
 
     val profile = (profileState as? UiState.Success)?.data
     val cartItems = (cartState as? UiState.Success)?.data ?: emptyList()
@@ -217,6 +242,10 @@ private fun AuthenticatedPharmacyApp(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: PharmacyRoutes.HOME
     val snackbarHostState = remember { SnackbarHostState() }
+    val homeListState = rememberLazyListState()
+    val notificationsListState = rememberLazyListState()
+    val favoritesListState = rememberLazyListState()
+    val profileScrollState = rememberScrollState()
 
     LaunchedEffect(actionMessage) {
         val msg = actionMessage
@@ -274,7 +303,55 @@ private fun AuthenticatedPharmacyApp(
                 ) {
                     NavHost(
                         navController = navController,
-                        startDestination = PharmacyRoutes.HOME
+                        startDestination = PharmacyRoutes.HOME,
+                        enterTransition = {
+                            val isTabSwitch = initialState.destination.route in topLevelRoutes &&
+                                targetState.destination.route in topLevelRoutes
+                            if (isTabSwitch) {
+                                fadeIn(animationSpec = tween(180))
+                            } else {
+                                slideIntoContainer(
+                                    towards = AnimatedContentTransitionScope.SlideDirection.Start,
+                                    animationSpec = tween(280)
+                                ) + fadeIn(animationSpec = tween(200))
+                            }
+                        },
+                        exitTransition = {
+                            val isTabSwitch = initialState.destination.route in topLevelRoutes &&
+                                targetState.destination.route in topLevelRoutes
+                            if (isTabSwitch) {
+                                fadeOut(animationSpec = tween(180))
+                            } else {
+                                slideOutOfContainer(
+                                    towards = AnimatedContentTransitionScope.SlideDirection.Start,
+                                    animationSpec = tween(280)
+                                ) + fadeOut(animationSpec = tween(180))
+                            }
+                        },
+                        popEnterTransition = {
+                            val isTabSwitch = initialState.destination.route in topLevelRoutes &&
+                                targetState.destination.route in topLevelRoutes
+                            if (isTabSwitch) {
+                                fadeIn(animationSpec = tween(180))
+                            } else {
+                                slideIntoContainer(
+                                    towards = AnimatedContentTransitionScope.SlideDirection.End,
+                                    animationSpec = tween(280)
+                                ) + fadeIn(animationSpec = tween(200))
+                            }
+                        },
+                        popExitTransition = {
+                            val isTabSwitch = initialState.destination.route in topLevelRoutes &&
+                                targetState.destination.route in topLevelRoutes
+                            if (isTabSwitch) {
+                                fadeOut(animationSpec = tween(180))
+                            } else {
+                                slideOutOfContainer(
+                                    towards = AnimatedContentTransitionScope.SlideDirection.End,
+                                    animationSpec = tween(280)
+                                ) + fadeOut(animationSpec = tween(180))
+                            }
+                        }
                     ) {
                         composable(PharmacyRoutes.HOME) {
                             HomeScreen(
@@ -287,7 +364,7 @@ private fun AuthenticatedPharmacyApp(
                                     navController.navigate(PharmacyRoutes.searchRoute(categoryId))
                                 },
                                 onOpenNotifications = { navController.navigate(PharmacyRoutes.NOTIFICATIONS) },
-                                onOpenSettings = { navController.navigate(PharmacyRoutes.PROFILE) },
+                                onOpenChats = { navController.navigate(PharmacyRoutes.CHATS) },
                                 onOpenProduct = { prod ->
                                     navController.navigate("${PharmacyRoutes.PRODUCT_DETAIL}/${prod.id}")
                                 },
@@ -295,10 +372,19 @@ private fun AuthenticatedPharmacyApp(
                                     navController.navigate("${PharmacyRoutes.PHARMACY_PROFILE}/${pharmacy.id}")
                                 },
                                 onOpenPharmaciesList = {
-                                    navController.navigate(PharmacyRoutes.PHARMACIES_LIST)
+                                    navController.navigate(PharmacyRoutes.pharmaciesRoute())
+                                },
+                                onOpen24hPharmacies = {
+                                    navController.navigate(
+                                        PharmacyRoutes.pharmaciesRoute(PharmacyScheduleFilter.ALWAYS_24H)
+                                    )
                                 },
                                 onAddToCart = { prod -> viewModel.addToCart(prod, 1) },
-                                onToggleFavorite = viewModel::toggleFavorite
+                                onToggleFavorite = viewModel::toggleFavorite,
+                                updateState = appUpdateState,
+                                onUpdateNow = onLaunchUpdateDownload,
+                                onDismissUpdate = viewModel::dismissUpdateBanner,
+                                listState = homeListState
                             )
                         }
 
@@ -309,7 +395,8 @@ private fun AuthenticatedPharmacyApp(
                                     navController.navigate(PharmacyRoutes.searchRoute("vitamins"))
                                 },
                                 onOpenChats = { navController.navigate(PharmacyRoutes.CHATS) },
-                                onOpenPharmacies = { navController.navigate(PharmacyRoutes.PHARMACIES_LIST) }
+                                onOpenPharmacies = { navController.navigate(PharmacyRoutes.pharmaciesRoute()) },
+                                listState = notificationsListState
                             )
                         }
 
@@ -322,7 +409,8 @@ private fun AuthenticatedPharmacyApp(
                                 },
                                 onAddToCart = { prod -> viewModel.addToCart(prod, 1) },
                                 onToggleFavorite = viewModel::toggleFavorite,
-                                onRetry = viewModel::retryAll
+                                onRetry = viewModel::retryAll,
+                                listState = favoritesListState
                             )
                         }
 
@@ -335,7 +423,13 @@ private fun AuthenticatedPharmacyApp(
                                 onToggleLanguage = viewModel::toggleLanguage,
                                 onToggleNotifications = viewModel::toggleNotifications,
                                 onRetry = viewModel::retryAll,
-                                onSignedOut = onSignedOut
+                                onSignedOut = onSignedOut,
+                                configuredRepo = configuredRepo,
+                                updateState = appUpdateState,
+                                onSaveRepoAndCheck = viewModel::saveRepoAndCheckUpdates,
+                                onCheckUpdates = { viewModel.checkForUpdates(manual = true) },
+                                onDownloadUpdate = onLaunchUpdateDownload,
+                                scrollState = profileScrollState
                             )
                         }
 
@@ -367,9 +461,24 @@ private fun AuthenticatedPharmacyApp(
                             )
                         }
 
-                        composable(PharmacyRoutes.PHARMACIES_LIST) {
+                        composable(
+                            route = "${PharmacyRoutes.PHARMACIES_LIST}?schedule={schedule}",
+                            arguments = listOf(
+                                navArgument("schedule") {
+                                    type = NavType.StringType
+                                    defaultValue = PharmacyScheduleFilter.ALL.name
+                                }
+                            )
+                        ) { backStackEntry ->
+                            val scheduleName = backStackEntry.arguments?.getString("schedule")
+                            val initialSchedule = runCatching {
+                                if (scheduleName.isNullOrBlank()) PharmacyScheduleFilter.ALL
+                                else PharmacyScheduleFilter.valueOf(scheduleName)
+                            }.getOrDefault(PharmacyScheduleFilter.ALL)
+
                             PharmaciesListScreen(
                                 cartCount = cartCount,
+                                initialScheduleFilter = initialSchedule,
                                 onBack = { navController.popBackStack() },
                                 onOpenCart = { navController.navigate(PharmacyRoutes.CART) },
                                 onOpenPharmacy = { pharmacy ->
@@ -439,7 +548,7 @@ private fun AuthenticatedPharmacyApp(
                                     navController.navigate("${PharmacyRoutes.LIVE_CHAT}/${pharmacy.id}")
                                 },
                                 onOpenPharmaciesList = {
-                                    navController.navigate(PharmacyRoutes.PHARMACIES_LIST)
+                                    navController.navigate(PharmacyRoutes.pharmaciesRoute())
                                 }
                             )
                         }

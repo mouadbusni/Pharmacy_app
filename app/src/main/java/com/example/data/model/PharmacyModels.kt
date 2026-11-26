@@ -30,6 +30,12 @@ enum class PharmacyScheduleFilter {
     DAY_DUTY
 }
 
+enum class PrescriptionFilter {
+    ALL,
+    OTC,
+    RX_REQUIRED
+}
+
 enum class NotificationTarget {
     PROMO_VITAMINS,
     CHATS,

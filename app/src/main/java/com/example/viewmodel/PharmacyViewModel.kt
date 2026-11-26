@@ -3,6 +3,7 @@ package com.example.viewmodel
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.BuildConfig
 import com.example.data.catalog.PharmacyCatalog
 import com.example.data.model.CartItem
 import com.example.data.model.ChatMessage
@@ -12,6 +13,9 @@ import com.example.data.model.Product
 import com.example.data.model.RecentSearch
 import com.example.data.model.UserProfile
 import com.example.data.repository.PharmacyDataSource
+import com.example.data.update.AppUpdateState
+import com.example.data.update.GitHubReleaseChecker
+import com.example.data.update.UpdatePreferencesStore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -21,6 +25,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
@@ -36,7 +41,8 @@ sealed interface UiState<out T> {
 @OptIn(ExperimentalCoroutinesApi::class)
 class PharmacyViewModel(
     private val repository: PharmacyDataSource,
-    private val currentUserId: String
+    private val currentUserId: String,
+    private val updatePreferencesStore: UpdatePreferencesStore? = null
 ) : ViewModel() {
 
     private val _actionMessage = MutableStateFlow<String?>(null)
@@ -48,10 +54,98 @@ class PharmacyViewModel(
     private val _isSubmittingOrder = MutableStateFlow(false)
     val isSubmittingOrder: StateFlow<Boolean> = _isSubmittingOrder.asStateFlow()
 
+    private val _appUpdateState = MutableStateFlow<AppUpdateState>(AppUpdateState.Idle)
+    val appUpdateState: StateFlow<AppUpdateState> = _appUpdateState.asStateFlow()
+
+    val configuredRepo: StateFlow<String> = (updatePreferencesStore?.repoSlugFlow ?: MutableStateFlow(""))
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+            initialValue = ""
+        )
+
     private val _refreshSignal = MutableStateFlow(0)
 
     init {
         initializeUser()
+        autoCheckForUpdates()
+    }
+
+    private fun autoCheckForUpdates() {
+        val store = updatePreferencesStore ?: return
+        viewModelScope.launch {
+            val savedRepo = store.repoSlugFlow.first()
+            if (UpdatePreferencesStore.isValidRepoSlug(savedRepo)) {
+                checkForUpdates(repoOverride = savedRepo, manual = false)
+            }
+        }
+    }
+
+    fun saveRepoAndCheckUpdates(rawRepo: String) {
+        val store = updatePreferencesStore ?: return
+        val normalized = UpdatePreferencesStore.normalizeRepoSlug(rawRepo)
+        if (!UpdatePreferencesStore.isValidRepoSlug(normalized)) {
+            _appUpdateState.value = AppUpdateState.Error(
+                if (isEnglish()) "Invalid repository format. Use owner/repo"
+                else "صيغة غير صحيحة — استخدم owner/repo"
+            )
+            return
+        }
+        viewModelScope.launch {
+            store.saveRepoSlug(normalized)
+            checkForUpdates(repoOverride = normalized, manual = true)
+        }
+    }
+
+    fun checkForUpdates(repoOverride: String? = null, manual: Boolean = true) {
+        val store = updatePreferencesStore ?: return
+        viewModelScope.launch {
+            val targetRepo = (repoOverride ?: store.repoSlugFlow.first()).trim()
+            if (!UpdatePreferencesStore.isValidRepoSlug(targetRepo)) {
+                if (manual) {
+                    _appUpdateState.value = AppUpdateState.Error(
+                        if (isEnglish()) "Enter a GitHub repository (owner/repo) first"
+                        else "يرجى إدخال مستودع GitHub أولاً بصيغة owner/repo"
+                    )
+                }
+                return@launch
+            }
+            _appUpdateState.value = AppUpdateState.Checking
+            val dismissedTag = store.dismissedTagFlow.first()
+            GitHubReleaseChecker.fetchLatestRelease(
+                repoSlug = targetRepo,
+                installedVersionName = BuildConfig.VERSION_NAME,
+                installedVersionCode = BuildConfig.VERSION_CODE
+            ).onSuccess { (info, isNewer) ->
+                _appUpdateState.value = if (isNewer) {
+                    AppUpdateState.UpdateAvailable(
+                        info = info,
+                        isDismissed = !manual && dismissedTag == info.tagName
+                    )
+                } else {
+                    AppUpdateState.UpToDate("v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
+                }
+            }.onFailure { err ->
+                if (manual) {
+                    _appUpdateState.value = AppUpdateState.Error(
+                        err.localizedMessage ?: "Failed to check GitHub Releases"
+                    )
+                } else {
+                    _appUpdateState.value = AppUpdateState.Idle
+                }
+            }
+        }
+    }
+
+    fun dismissUpdateBanner(tagName: String) {
+        val store = updatePreferencesStore ?: return
+        val current = _appUpdateState.value
+        if (current is AppUpdateState.UpdateAvailable && current.info.tagName == tagName) {
+            _appUpdateState.value = current.copy(isDismissed = true)
+        }
+        viewModelScope.launch {
+            store.dismissReleaseTag(tagName)
+        }
     }
 
     private fun initializeUser() {

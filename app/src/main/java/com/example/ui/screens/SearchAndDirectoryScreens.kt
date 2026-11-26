@@ -18,8 +18,10 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -34,6 +36,7 @@ import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
@@ -43,6 +46,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -57,6 +61,7 @@ import com.example.data.model.NotificationTarget
 import com.example.data.model.Pharmacy
 import com.example.data.model.PharmacySchedule
 import com.example.data.model.PharmacyScheduleFilter
+import com.example.data.model.PrescriptionFilter
 import com.example.data.model.Product
 import com.example.data.model.RecentSearch
 import com.example.ui.components.BackCircleButton
@@ -66,6 +71,7 @@ import com.example.ui.components.HeaderCircleIconButton
 import com.example.ui.components.LoadingStateCard
 import com.example.ui.components.PharmacyListCard
 import com.example.ui.components.PharmacyScheduleFilterRow
+import com.example.ui.components.PrescriptionFilterRow
 import com.example.ui.components.ProductCard
 import com.example.ui.components.SectionHeaderRow
 import com.example.ui.theme.BorderSubtle
@@ -98,15 +104,21 @@ fun SearchProductsScreen(
     modifier: Modifier = Modifier
 ) {
     val strings = LocalAppStrings.current
-    var query by remember { mutableStateOf("") }
-    var selectedCategoryId by remember(initialCategoryId) { mutableStateOf(initialCategoryId) }
+    var query by rememberSaveable { mutableStateOf("") }
+    var selectedCategoryId by rememberSaveable(initialCategoryId) { mutableStateOf(initialCategoryId) }
+    var selectedPrescriptionFilter by rememberSaveable { mutableStateOf(PrescriptionFilter.ALL) }
 
     val recentSearches = (recentSearchesState as? UiState.Success)?.data ?: emptyList()
 
-    val filteredProducts = remember(query, selectedCategoryId) {
+    val filteredProducts = remember(query, selectedCategoryId, selectedPrescriptionFilter) {
         val trimmed = query.trim()
         PharmacyCatalog.products.filter { prod ->
             val catMatch = selectedCategoryId == "all" || prod.categoryId == selectedCategoryId
+            val rxMatch = when (selectedPrescriptionFilter) {
+                PrescriptionFilter.ALL -> true
+                PrescriptionFilter.OTC -> !prod.requiresPrescription
+                PrescriptionFilter.RX_REQUIRED -> prod.requiresPrescription
+            }
             val textMatch = trimmed.isBlank() ||
                 prod.nameAr.contains(trimmed, ignoreCase = true) ||
                 prod.nameEn.contains(trimmed, ignoreCase = true) ||
@@ -114,7 +126,7 @@ fun SearchProductsScreen(
                 prod.subtitleEn.contains(trimmed, ignoreCase = true) ||
                 prod.categoryAr.contains(trimmed, ignoreCase = true) ||
                 prod.categoryEn.contains(trimmed, ignoreCase = true)
-            catMatch && textMatch
+            catMatch && rxMatch && textMatch
         }
     }
 
@@ -177,21 +189,42 @@ fun SearchProductsScreen(
                         )
                     },
                     trailingIcon = {
-                        Surface(
-                            onClick = { onSubmitSearch(query) },
-                            shape = CircleShape,
-                            color = ForestGreen,
-                            modifier = Modifier
-                                .minimumInteractiveComponentSize()
-                                .size(38.dp)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(2.dp),
+                            modifier = Modifier.padding(end = 6.dp)
                         ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Filled.Search,
-                                    contentDescription = strings.searchAction,
-                                    tint = PureWhite,
-                                    modifier = Modifier.size(18.dp)
-                                )
+                            if (query.isNotEmpty()) {
+                                IconButton(
+                                    onClick = { query = "" },
+                                    modifier = Modifier
+                                        .minimumInteractiveComponentSize()
+                                        .testTag("products_search_clear")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Close,
+                                        contentDescription = strings.clearSearch,
+                                        tint = TextSecondary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                            Surface(
+                                onClick = { onSubmitSearch(query) },
+                                shape = CircleShape,
+                                color = ForestGreen,
+                                modifier = Modifier
+                                    .minimumInteractiveComponentSize()
+                                    .size(38.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Search,
+                                        contentDescription = strings.searchAction,
+                                        tint = PureWhite,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
                             }
                         }
                     },
@@ -293,6 +326,10 @@ fun SearchProductsScreen(
                             )
                         }
                     }
+                    PrescriptionFilterRow(
+                        selected = selectedPrescriptionFilter,
+                        onSelect = { selectedPrescriptionFilter = it }
+                    )
                 }
             }
 
@@ -321,13 +358,38 @@ fun SearchProductsScreen(
                             .fillMaxWidth()
                             .padding(horizontal = 18.dp)
                     ) {
-                        Text(
-                            text = strings.noMatchingProducts,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = TextSecondary,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(24.dp)
-                        )
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Text(
+                                text = strings.noMatchingProducts,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = TextSecondary,
+                                textAlign = TextAlign.Center
+                            )
+                            OutlinedButton(
+                                onClick = {
+                                    query = ""
+                                    selectedCategoryId = "all"
+                                    selectedPrescriptionFilter = PrescriptionFilter.ALL
+                                },
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(1.dp, ForestGreen),
+                                modifier = Modifier
+                                    .minimumInteractiveComponentSize()
+                                    .testTag("products_reset_filters")
+                            ) {
+                                Text(
+                                    text = strings.resetFilters,
+                                    color = ForestGreen,
+                                    style = MaterialTheme.typography.labelLarge
+                                )
+                            }
+                        }
                     }
                 }
             } else {
@@ -362,14 +424,17 @@ fun SearchProductsScreen(
 @Composable
 fun PharmaciesListScreen(
     cartCount: Int,
+    initialScheduleFilter: PharmacyScheduleFilter = PharmacyScheduleFilter.ALL,
     onBack: () -> Unit,
     onOpenCart: () -> Unit,
     onOpenPharmacy: (Pharmacy) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val strings = LocalAppStrings.current
-    var query by remember { mutableStateOf("") }
-    var selectedScheduleFilter by remember { mutableStateOf(PharmacyScheduleFilter.ALL) }
+    var query by rememberSaveable { mutableStateOf("") }
+    var selectedScheduleFilter by rememberSaveable(initialScheduleFilter) {
+        mutableStateOf(initialScheduleFilter)
+    }
 
     val filtered = remember(query, selectedScheduleFilter) {
         val trimmed = query.trim()
@@ -450,18 +515,39 @@ fun PharmaciesListScreen(
                         )
                     },
                     trailingIcon = {
-                        Surface(
-                            shape = CircleShape,
-                            color = ForestGreen,
-                            modifier = Modifier.size(36.dp)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(2.dp),
+                            modifier = Modifier.padding(end = 6.dp)
                         ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Filled.Search,
-                                    contentDescription = strings.searchAction,
-                                    tint = PureWhite,
-                                    modifier = Modifier.size(18.dp)
-                                )
+                            if (query.isNotEmpty()) {
+                                IconButton(
+                                    onClick = { query = "" },
+                                    modifier = Modifier
+                                        .minimumInteractiveComponentSize()
+                                        .testTag("pharmacies_search_clear")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Close,
+                                        contentDescription = strings.clearSearch,
+                                        tint = TextSecondary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                            Surface(
+                                shape = CircleShape,
+                                color = ForestGreen,
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Search,
+                                        contentDescription = strings.searchAction,
+                                        tint = PureWhite,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
                             }
                         }
                     },
@@ -476,6 +562,7 @@ fun PharmaciesListScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 18.dp)
+                        .testTag("pharmacies_search_field")
                 )
             }
 
@@ -526,13 +613,37 @@ fun PharmaciesListScreen(
                             .fillMaxWidth()
                             .padding(horizontal = 18.dp)
                     ) {
-                        Text(
-                            text = strings.noMatchingPharmacies,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = TextSecondary,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(24.dp)
-                        )
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Text(
+                                text = strings.noMatchingPharmacies,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = TextSecondary,
+                                textAlign = TextAlign.Center
+                            )
+                            OutlinedButton(
+                                onClick = {
+                                    query = ""
+                                    selectedScheduleFilter = PharmacyScheduleFilter.ALL
+                                },
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(1.dp, ForestGreen),
+                                modifier = Modifier
+                                    .minimumInteractiveComponentSize()
+                                    .testTag("pharmacies_reset_filters")
+                            ) {
+                                Text(
+                                    text = strings.resetFilters,
+                                    color = ForestGreen,
+                                    style = MaterialTheme.typography.labelLarge
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -622,6 +733,7 @@ fun FavoritesScreen(
     onAddToCart: (Product) -> Unit,
     onToggleFavorite: (Product, Boolean) -> Unit,
     onRetry: () -> Unit,
+    listState: LazyListState = rememberLazyListState(),
     modifier: Modifier = Modifier
 ) {
     val strings = LocalAppStrings.current
@@ -646,6 +758,7 @@ fun FavoritesScreen(
         val bottomClearance = if (isWide) 28.dp else 112.dp
 
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .widthIn(max = maxContentWidth)
                 .fillMaxSize(),
@@ -757,6 +870,7 @@ fun NotificationsScreen(
     onOpenPromoVitamins: () -> Unit,
     onOpenChats: () -> Unit,
     onOpenPharmacies: () -> Unit,
+    listState: LazyListState = rememberLazyListState(),
     modifier: Modifier = Modifier
 ) {
     val strings = LocalAppStrings.current
@@ -771,6 +885,7 @@ fun NotificationsScreen(
         val bottomClearance = if (isWide) 28.dp else 112.dp
 
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .widthIn(max = maxContentWidth)
                 .fillMaxSize(),

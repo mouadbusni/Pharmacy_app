@@ -1,5 +1,10 @@
 package com.example.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -26,18 +31,24 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.outlined.Chat
+import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.LocalPharmacy
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -45,6 +56,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -68,7 +80,10 @@ import com.example.data.model.PackagingStyle
 import com.example.data.model.Pharmacy
 import com.example.data.model.PharmacyCategory
 import com.example.data.model.PharmacyScheduleFilter
+import com.example.data.model.PrescriptionFilter
 import com.example.data.model.Product
+import com.example.data.update.AppUpdateInfo
+import com.example.data.update.AppUpdateState
 import com.example.ui.theme.AppStrings
 import com.example.ui.theme.BorderSubtle
 import com.example.ui.theme.ForestGreen
@@ -726,6 +741,256 @@ fun PharmacyScheduleFilterRow(
                         color = if (isSelected) activeFg else TextSecondary,
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                     )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PrescriptionFilterRow(
+    selected: PrescriptionFilter,
+    onSelect: (PrescriptionFilter) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val strings = LocalAppStrings.current
+    val options = listOf(
+        PrescriptionFilter.ALL to strings.filterAllProducts,
+        PrescriptionFilter.OTC to strings.otcLabel,
+        PrescriptionFilter.RX_REQUIRED to strings.prescriptionRequiredLabel
+    )
+    LazyRow(
+        modifier = modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(horizontal = 18.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        items(options, key = { it.first.name }) { (filter, label) ->
+            val isSelected = selected == filter
+            val activeBg = when (filter) {
+                PrescriptionFilter.RX_REQUIRED -> StatusClosedBg
+                else -> MintSoft
+            }
+            val activeFg = when (filter) {
+                PrescriptionFilter.RX_REQUIRED -> StatusClosedRed
+                else -> ForestGreen
+            }
+            Surface(
+                onClick = { onSelect(filter) },
+                shape = RoundedCornerShape(14.dp),
+                color = if (isSelected) activeBg else PureWhite,
+                border = BorderStroke(
+                    width = if (isSelected) 1.5.dp else 1.dp,
+                    color = if (isSelected) activeFg else BorderSubtle
+                ),
+                modifier = Modifier
+                    .minimumInteractiveComponentSize()
+                    .testTag("prescription_filter_${filter.name.lowercase()}")
+            ) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+                ) {
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = if (isSelected) activeFg else TextSecondary,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun HomeQuickShortcutsRow(
+    onOpenPharmaciesList: () -> Unit,
+    onOpen24hPharmacies: () -> Unit,
+    onOpenChats: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val strings = LocalAppStrings.current
+    LazyRow(
+        modifier = modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(horizontal = 18.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        item(key = "shortcut_pharmacies") {
+            QuickShortcutPill(
+                label = strings.quickDirectory,
+                icon = Icons.Filled.LocalPharmacy,
+                accentColor = ForestGreen,
+                containerColor = PureWhite,
+                onClick = onOpenPharmaciesList,
+                modifier = Modifier.testTag("home_shortcut_directory")
+            )
+        }
+        item(key = "shortcut_24h") {
+            QuickShortcutPill(
+                label = strings.quickOpen24h,
+                icon = Icons.Filled.AccessTime,
+                accentColor = StatusOpenGreen,
+                containerColor = PureWhite,
+                onClick = onOpen24hPharmacies,
+                modifier = Modifier.testTag("home_shortcut_24h")
+            )
+        }
+        item(key = "shortcut_chats") {
+            QuickShortcutPill(
+                label = strings.quickPharmacistChat,
+                icon = Icons.AutoMirrored.Outlined.Chat,
+                accentColor = ForestGreen,
+                containerColor = MintSoft,
+                onClick = onOpenChats,
+                modifier = Modifier.testTag("home_shortcut_chats")
+            )
+        }
+    }
+}
+
+@Composable
+private fun QuickShortcutPill(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    accentColor: Color,
+    containerColor: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(14.dp),
+        color = containerColor,
+        border = BorderStroke(1.dp, BorderSubtle),
+        shadowElevation = 1.dp,
+        modifier = modifier.minimumInteractiveComponentSize()
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 13.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(7.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = accentColor,
+                modifier = Modifier.size(18.dp)
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge,
+                color = TextPrimary,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1
+            )
+        }
+    }
+}
+
+@Composable
+fun AppUpdateBannerCard(
+    updateState: AppUpdateState,
+    onUpdateNow: (AppUpdateInfo) -> Unit,
+    onDismiss: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val strings = LocalAppStrings.current
+    val available = updateState as? AppUpdateState.UpdateAvailable
+    val visible = available != null && !available.isDismissed
+
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn() + expandVertically(),
+        exit = fadeOut() + shrinkVertically(),
+        modifier = modifier
+    ) {
+        if (available != null) {
+            val info = available.info
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = MintSoft,
+                border = BorderStroke(1.2.dp, ForestGreen.copy(alpha = 0.35f)),
+                shadowElevation = 2.dp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp)
+                    .testTag("home_update_banner")
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = ForestGreen,
+                            modifier = Modifier.size(38.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Filled.SystemUpdate,
+                                    contentDescription = strings.updateAvailableTitle,
+                                    tint = PureWhite,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "${strings.updateAvailableTitle} • ${info.tagName}",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = ForestGreen,
+                                fontWeight = FontWeight.Bold
+                            )
+                            if (info.releaseNotes.isNotBlank()) {
+                                Text(
+                                    text = info.releaseNotes,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = TextSecondary,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TextButton(
+                            onClick = { onDismiss(info.tagName) },
+                            modifier = Modifier
+                                .minimumInteractiveComponentSize()
+                                .testTag("update_later_button")
+                        ) {
+                            Text(
+                                text = strings.laterAction,
+                                color = TextSecondary,
+                                style = MaterialTheme.typography.labelLarge
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Button(
+                            onClick = { onUpdateNow(info) },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = ForestGreen),
+                            modifier = Modifier
+                                .minimumInteractiveComponentSize()
+                                .testTag("update_now_button")
+                        ) {
+                            Text(
+                                text = strings.updateNowAction,
+                                color = PureWhite,
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
                 }
             }
         }

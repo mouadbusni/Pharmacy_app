@@ -20,16 +20,18 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -41,6 +43,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,8 +62,12 @@ import com.example.data.model.Pharmacy
 import com.example.data.model.PharmacySchedule
 import com.example.data.model.PharmacyScheduleFilter
 import com.example.data.model.Product
+import com.example.data.update.AppUpdateInfo
+import com.example.data.update.AppUpdateState
+import com.example.ui.components.AppUpdateBannerCard
 import com.example.ui.components.CategoryCircleItem
 import com.example.ui.components.HeaderCircleIconButton
+import com.example.ui.components.HomeQuickShortcutsRow
 import com.example.ui.components.PharmacyListCard
 import com.example.ui.components.PharmacyScheduleFilterRow
 import com.example.ui.components.ProductCard
@@ -85,17 +92,22 @@ fun HomeScreen(
     onSelectLocation: (String) -> Unit,
     onOpenSearch: (String) -> Unit,
     onOpenNotifications: () -> Unit,
-    onOpenSettings: () -> Unit,
+    onOpenChats: () -> Unit,
     onOpenProduct: (Product) -> Unit,
     onOpenPharmacy: (Pharmacy) -> Unit,
     onOpenPharmaciesList: () -> Unit,
+    onOpen24hPharmacies: () -> Unit,
     onAddToCart: (Product) -> Unit,
     onToggleFavorite: (Product, Boolean) -> Unit,
+    updateState: AppUpdateState = AppUpdateState.Idle,
+    onUpdateNow: (AppUpdateInfo) -> Unit = {},
+    onDismissUpdate: (String) -> Unit = {},
+    listState: LazyListState = rememberLazyListState(),
     modifier: Modifier = Modifier
 ) {
     val strings = LocalAppStrings.current
     var showLocationSheet by remember { mutableStateOf(false) }
-    var selectedScheduleFilter by remember { mutableStateOf(PharmacyScheduleFilter.ALL) }
+    var selectedScheduleFilter by rememberSaveable { mutableStateOf(PharmacyScheduleFilter.ALL) }
 
     val filteredProducts = remember(selectedCategoryId) {
         if (selectedCategoryId == "all") {
@@ -130,6 +142,7 @@ fun HomeScreen(
         val pharmaciesPreview = remember(filteredPharmacies) { filteredPharmacies.take(4) }
 
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .widthIn(max = maxContentWidth)
                 .fillMaxSize(),
@@ -192,6 +205,18 @@ fun HomeScreen(
 
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         HeaderCircleIconButton(
+                            onClick = onOpenChats,
+                            contentDescription = strings.chatsTitle,
+                            modifier = Modifier.testTag("home_chats_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.Chat,
+                                contentDescription = strings.chatsTitle,
+                                tint = ForestGreen,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        HeaderCircleIconButton(
                             onClick = onOpenNotifications,
                             contentDescription = strings.notifications,
                             badgeCount = 2,
@@ -204,19 +229,17 @@ fun HomeScreen(
                                 modifier = Modifier.size(20.dp)
                             )
                         }
-                        HeaderCircleIconButton(
-                            onClick = onOpenSettings,
-                            contentDescription = strings.settings,
-                            modifier = Modifier.testTag("home_settings_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Settings,
-                                contentDescription = strings.settings,
-                                tint = ForestGreen,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
                     }
+                }
+            }
+
+            if (updateState is AppUpdateState.UpdateAvailable && !updateState.isDismissed) {
+                item(key = "home_update_banner_item") {
+                    AppUpdateBannerCard(
+                        updateState = updateState,
+                        onUpdateNow = onUpdateNow,
+                        onDismiss = onDismissUpdate
+                    )
                 }
             }
 
@@ -266,6 +289,14 @@ fun HomeScreen(
                         }
                     }
                 }
+            }
+
+            item {
+                HomeQuickShortcutsRow(
+                    onOpenPharmaciesList = onOpenPharmaciesList,
+                    onOpen24hPharmacies = onOpen24hPharmacies,
+                    onOpenChats = onOpenChats
+                )
             }
 
             item {

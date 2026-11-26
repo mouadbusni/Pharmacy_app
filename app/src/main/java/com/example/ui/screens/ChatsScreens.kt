@@ -33,12 +33,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
@@ -49,6 +51,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -92,7 +95,7 @@ fun ChatListScreen(
     modifier: Modifier = Modifier
 ) {
     val strings = LocalAppStrings.current
-    var searchQuery by remember { mutableStateOf("") }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
     val filteredPharmacies = remember(searchQuery) {
         val trimmed = searchQuery.trim()
         if (trimmed.isBlank()) PharmacyCatalog.pharmacies
@@ -162,18 +165,39 @@ fun ChatListScreen(
                         )
                     },
                     trailingIcon = {
-                        Surface(
-                            shape = CircleShape,
-                            color = ForestGreen,
-                            modifier = Modifier.size(36.dp)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(2.dp),
+                            modifier = Modifier.padding(end = 6.dp)
                         ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Filled.Search,
-                                    contentDescription = strings.searchAction,
-                                    tint = PureWhite,
-                                    modifier = Modifier.size(18.dp)
-                                )
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(
+                                    onClick = { searchQuery = "" },
+                                    modifier = Modifier
+                                        .minimumInteractiveComponentSize()
+                                        .testTag("chat_search_clear")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Close,
+                                        contentDescription = strings.clearSearch,
+                                        tint = TextSecondary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                            Surface(
+                                shape = CircleShape,
+                                color = ForestGreen,
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Search,
+                                        contentDescription = strings.searchAction,
+                                        tint = PureWhite,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
                             }
                         }
                     },
@@ -255,13 +279,34 @@ fun ChatListScreen(
                             .fillMaxWidth()
                             .padding(horizontal = 18.dp)
                     ) {
-                        Text(
-                            text = strings.noMatchingPharmacies,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = TextSecondary,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(24.dp)
-                        )
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Text(
+                                text = strings.noMatchingPharmacies,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = TextSecondary,
+                                textAlign = TextAlign.Center
+                            )
+                            OutlinedButton(
+                                onClick = { searchQuery = "" },
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(1.dp, ForestGreen),
+                                modifier = Modifier
+                                    .minimumInteractiveComponentSize()
+                                    .testTag("chat_reset_filters")
+                            ) {
+                                Text(
+                                    text = strings.resetFilters,
+                                    color = ForestGreen,
+                                    style = MaterialTheme.typography.labelLarge
+                                )
+                            }
+                        }
                     }
                 }
             } else {
