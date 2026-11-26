@@ -132,7 +132,10 @@ fun ProfileScreen(
     var showUpdatesDialog by remember { mutableStateOf(false) }
     var repoInput by remember(configuredRepo, showUpdatesDialog) { mutableStateOf(configuredRepo) }
     var repoValidationError by remember { mutableStateOf(false) }
-    val appShareUrl = stringResource(id = R.string.app_share_url)
+    val defaultShareUrl = stringResource(id = R.string.app_share_url)
+    val appShareUrl = remember(configuredRepo, defaultShareUrl) {
+        if (configuredRepo.isNotBlank()) "https://github.com/$configuredRepo/releases" else defaultShareUrl
+    }
 
     val currentLanguage = profile?.language ?: "ar"
     val notificationsEnabled = profile?.notificationsEnabled ?: true
