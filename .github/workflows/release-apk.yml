@@ -42,6 +42,9 @@ jobs:
             gradle :app:assembleRelease
             cp app/build/outputs/apk/release/app-release.apk Saydaliyati-v1.0.${{ github.run_number }}.apk
           else
+            if [ ! -f debug.keystore ] && [ -f debug.keystore.base64 ]; then
+              base64 -d debug.keystore.base64 > debug.keystore
+            fi
             gradle :app:assembleDebug
             cp app/build/outputs/apk/debug/app-debug.apk Saydaliyati-v1.0.${{ github.run_number }}.apk
           fi
