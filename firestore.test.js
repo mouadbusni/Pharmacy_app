@@ -303,6 +303,55 @@ test("PharmacyOrder: create confirmed, update status, terminal lock & tamper den
     })
   );
 
+  // Create enriched order with delivery details, prescription metadata & itemsSummary
+  const enrichedOrderRef = aliceDb
+    .collection("users")
+    .doc(ALICE_UID)
+    .collection("orders")
+    .doc("order_2");
+
+  await assertSucceeds(
+    enrichedOrderRef.set({
+      userId: ALICE_UID,
+      paymentMethod: "cash",
+      subtotalUsd: 80,
+      deliveryUsd: 20,
+      totalUsd: 100,
+      itemCount: 2,
+      status: "confirmed",
+      deliveryLocation: "المعاريف - الدار البيضاء",
+      deliveryAddress: "14 Rue Zerktouni, Apt 4",
+      contactPhone: "+212612345678",
+      hasPrescription: true,
+      prescriptionAttached: true,
+      itemsSummary: "prod_amoxil:1;prod_doliprane:1",
+      createdAt: now,
+      updatedAt: now,
+    })
+  );
+
+  // Reject invalid boolean/string types for new optional order fields
+  await assertFails(
+    aliceDb
+      .collection("users")
+      .doc(ALICE_UID)
+      .collection("orders")
+      .doc("order_bad_rx")
+      .set({
+        userId: ALICE_UID,
+        paymentMethod: "cash",
+        subtotalUsd: 80,
+        deliveryUsd: 20,
+        totalUsd: 100,
+        itemCount: 2,
+        status: "confirmed",
+        deliveryLocation: "المعاريف - الدار البيضاء",
+        hasPrescription: "yes",
+        createdAt: now,
+        updatedAt: now,
+      })
+  );
+
   // Valid transition to delivered
   await assertSucceeds(
     orderRef.update({
@@ -320,7 +369,7 @@ test("PharmacyOrder: create confirmed, update status, terminal lock & tamper den
   );
 });
 
-test("ChatMessage: owner create/list per pharmacy and cross-user denial", async () => {
+test("ChatMessage: owner create/list per pharmacy, attachments, and cross-user denial", async () => {
   const aliceDb = testEnv.authenticatedContext(ALICE_UID).firestore();
   const bobDb = testEnv.authenticatedContext(BOB_UID).firestore();
   const now = new Date(Date.now() - 2000);
@@ -338,6 +387,18 @@ test("ChatMessage: owner create/list per pharmacy and cross-user denial", async 
       pharmacyId: "pharm_perla",
       senderType: "USER",
       text: "مرحبا يعطيك العافية",
+      createdAt: now,
+    })
+  );
+
+  await assertSucceeds(
+    messagesCol.doc("msg_rx").set({
+      userId: ALICE_UID,
+      pharmacyId: "pharm_perla",
+      senderType: "USER",
+      text: "صورة الوصفة الطبية",
+      attachmentUri: "content://media/picker/0/com.android.providers.media.photopicker/media/42",
+      attachmentLabel: "prescription_photo.jpg",
       createdAt: now,
     })
   );

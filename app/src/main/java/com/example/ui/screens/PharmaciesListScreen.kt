@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,6 +25,8 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ShoppingBag
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -45,8 +48,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.data.catalog.PharmacyCatalog
 import com.example.data.model.Pharmacy
+import com.example.data.model.PharmacyOpenFilter
 import com.example.data.model.PharmacySchedule
 import com.example.data.model.PharmacyScheduleFilter
+import com.example.data.model.PharmacySortOption
 import com.example.ui.components.BackCircleButton
 import com.example.ui.components.HeaderCircleIconButton
 import com.example.ui.components.PharmacyListCard
@@ -55,6 +60,7 @@ import com.example.ui.components.SectionHeaderRow
 import com.example.ui.theme.BorderSubtle
 import com.example.ui.theme.ForestGreen
 import com.example.ui.theme.LocalAppStrings
+import com.example.ui.theme.MintSoft
 import com.example.ui.theme.NeutralBackground
 import com.example.ui.theme.PureWhite
 import com.example.ui.theme.StatusDutyAmber
@@ -76,15 +82,18 @@ fun PharmaciesListScreen(
     var selectedScheduleFilter by rememberSaveable(initialScheduleFilter) {
         mutableStateOf(initialScheduleFilter)
     }
+    var selectedOpenFilter by rememberSaveable { mutableStateOf(PharmacyOpenFilter.ALL) }
+    var selectedSortOption by rememberSaveable { mutableStateOf(PharmacySortOption.NEAREST) }
 
-    val filtered = remember(query, selectedScheduleFilter) {
+    val filtered = remember(query, selectedScheduleFilter, selectedOpenFilter, selectedSortOption) {
         val trimmed = query.trim()
-        PharmacyCatalog.pharmacies.filter { pharmacy ->
+        val matched = PharmacyCatalog.pharmacies.filter { pharmacy ->
             val scheduleMatch = when (selectedScheduleFilter) {
                 PharmacyScheduleFilter.ALL -> true
                 PharmacyScheduleFilter.ALWAYS_24H -> pharmacy.isAlways24h
                 PharmacyScheduleFilter.DAY_DUTY -> pharmacy.schedule == PharmacySchedule.DAY_DUTY
             }
+            val openMatch = selectedOpenFilter == PharmacyOpenFilter.ALL || pharmacy.openNow
             val queryMatch = trimmed.isBlank() ||
                 pharmacy.nameAr.contains(trimmed, ignoreCase = true) ||
                 pharmacy.nameEn.contains(trimmed, ignoreCase = true) ||
@@ -92,7 +101,16 @@ fun PharmaciesListScreen(
                 pharmacy.areaEn.contains(trimmed, ignoreCase = true) ||
                 pharmacy.addressAr.contains(trimmed, ignoreCase = true) ||
                 pharmacy.addressEn.contains(trimmed, ignoreCase = true)
-            scheduleMatch && queryMatch
+            scheduleMatch && openMatch && queryMatch
+        }
+        when (selectedSortOption) {
+            PharmacySortOption.NEAREST -> matched.sortedBy { it.distanceKmValue() }
+            PharmacySortOption.TOP_RATED -> matched.sortedByDescending { it.rating }
+            PharmacySortOption.OPEN_24H_FIRST -> matched.sortedWith(
+                compareByDescending<Pharmacy> { it.isAlways24h }
+                    .thenByDescending { it.openNow }
+                    .thenBy { it.distanceKmValue() }
+            )
         }
     }
     val always24hPharmacies = filtered.filter { it.isAlways24h }
@@ -215,6 +233,50 @@ fun PharmaciesListScreen(
             }
 
             item {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 18.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    item {
+                        val openSelected = selectedOpenFilter == PharmacyOpenFilter.OPEN_NOW
+                        FilterChip(
+                            selected = openSelected,
+                            onClick = {
+                                selectedOpenFilter = if (openSelected) {
+                                    PharmacyOpenFilter.ALL
+                                } else {
+                                    PharmacyOpenFilter.OPEN_NOW
+                                }
+                            },
+                            label = { Text(strings.filterOpenNowLabel) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MintSoft,
+                                selectedLabelColor = ForestGreen
+                            ),
+                            modifier = Modifier.testTag("filter_open_now_chip")
+                        )
+                    }
+                    val sortChoices = listOf(
+                        PharmacySortOption.NEAREST to strings.sortNearestLabel,
+                        PharmacySortOption.TOP_RATED to strings.sortTopRatedLabel,
+                        PharmacySortOption.OPEN_24H_FIRST to strings.sort24hFirstLabel
+                    )
+                    items(sortChoices) { (option, label) ->
+                        FilterChip(
+                            selected = selectedSortOption == option,
+                            onClick = { selectedSortOption = option },
+                            label = { Text(label) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = ForestGreen,
+                                selectedLabelColor = PureWhite
+                            ),
+                            modifier = Modifier.testTag("sort_${option.name.lowercase()}")
+                        )
+                    }
+                }
+            }
+
+            item {
                 Surface(
                     shape = RoundedCornerShape(16.dp),
                     color = StatusDutyBg.copy(alpha = 0.72f),
@@ -252,6 +314,8 @@ fun PharmaciesListScreen(
                         onResetFilters = {
                             query = ""
                             selectedScheduleFilter = PharmacyScheduleFilter.ALL
+                            selectedOpenFilter = PharmacyOpenFilter.ALL
+                            selectedSortOption = PharmacySortOption.NEAREST
                         }
                     )
                 }

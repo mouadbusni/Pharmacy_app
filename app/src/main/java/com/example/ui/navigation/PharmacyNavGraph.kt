@@ -16,6 +16,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.example.data.catalog.PharmacyCatalog
+import com.example.data.model.AppNotification
 import com.example.data.model.CartItem
 import com.example.data.model.FavoriteItem
 import com.example.data.model.PharmacyOrder
@@ -31,6 +32,7 @@ import com.example.ui.screens.FavoritesScreen
 import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.LiveChatScreen
 import com.example.ui.screens.NotificationsScreen
+import com.example.ui.screens.OrdersScreen
 import com.example.ui.screens.PharmaciesListScreen
 import com.example.ui.screens.PharmacyProfileScreen
 import com.example.ui.screens.ProductDetailScreen
@@ -52,6 +54,7 @@ object PharmacyRoutes {
     const val LIVE_CHAT = "live_chat"
     const val CART = "cart"
     const val CHECKOUT = "checkout"
+    const val ORDERS = "orders"
 
     val topLevelRoutes = setOf(HOME, NOTIFICATIONS, FAVORITES, PROFILE)
 
@@ -74,9 +77,14 @@ internal fun PharmacyNavGraph(
     favoriteIds: Set<String>,
     ordersState: UiState<List<PharmacyOrder>>,
     recentSearchesState: UiState<List<RecentSearch>>,
+    notifications: List<AppNotification>,
+    unreadNotificationsCount: Int,
     selectedHomeCategory: String,
     isSubmittingOrder: Boolean,
     isAdminMode: Boolean,
+    authDisplayName: String?,
+    authEmail: String?,
+    authPhotoUrl: String?,
     configuredRepo: String,
     appUpdateState: AppUpdateState,
     onLaunchUpdateDownload: (AppUpdateInfo) -> Unit,
@@ -169,18 +177,29 @@ internal fun PharmacyNavGraph(
                 updateState = appUpdateState,
                 onUpdateNow = onLaunchUpdateDownload,
                 onDismissUpdate = viewModel::dismissUpdateBanner,
+                unreadNotificationsCount = unreadNotificationsCount,
                 listState = homeListState
             )
         }
 
         composable(PharmacyRoutes.NOTIFICATIONS) {
             NotificationsScreen(
+                notifications = notifications,
                 onBack = { navController.popBackStack() },
+                onMarkNotificationRead = viewModel::markNotificationRead,
+                onMarkAllRead = viewModel::markAllNotificationsRead,
                 onOpenPromoVitamins = {
                     navController.navigate(PharmacyRoutes.searchRoute("vitamins"))
                 },
-                onOpenChats = { navController.navigate(PharmacyRoutes.CHATS) },
+                onOpenChats = { pharmacyId ->
+                    if (pharmacyId.isNullOrBlank()) {
+                        navController.navigate(PharmacyRoutes.CHATS)
+                    } else {
+                        navController.navigate("${PharmacyRoutes.LIVE_CHAT}/$pharmacyId")
+                    }
+                },
                 onOpenPharmacies = { navController.navigate(PharmacyRoutes.pharmaciesRoute()) },
+                onOpenOrders = { navController.navigate(PharmacyRoutes.ORDERS) },
                 listState = notificationsListState
             )
         }
@@ -204,10 +223,14 @@ internal fun PharmacyNavGraph(
                 profile = profile,
                 ordersState = ordersState,
                 isAdminMode = isAdminMode,
+                authDisplayName = authDisplayName,
+                authEmail = authEmail,
+                authPhotoUrl = authPhotoUrl,
                 onBack = { navController.popBackStack() },
                 onToggleLanguage = viewModel::toggleLanguage,
                 onToggleNotifications = viewModel::toggleNotifications,
-                onRetry = viewModel::retryAll,
+                onUpdateLocation = viewModel::updateLocation,
+                onOpenOrders = { navController.navigate(PharmacyRoutes.ORDERS) },
                 onSignedOut = onSignedOut,
                 configuredRepo = configuredRepo,
                 updateState = appUpdateState,
@@ -353,7 +376,9 @@ internal fun PharmacyNavGraph(
                 pharmacy = pharmacy,
                 chatState = chatState,
                 onBack = { navController.popBackStack() },
-                onSendMessage = { msg -> viewModel.sendMessage(pharmacy.id, msg) },
+                onSendMessage = { msg, attachmentUri, attachmentLabel ->
+                    viewModel.sendMessage(pharmacy.id, msg, attachmentUri, attachmentLabel)
+                },
                 onRetry = viewModel::retryAll
             )
         }
@@ -378,20 +403,46 @@ internal fun PharmacyNavGraph(
                 deliveryLocation = profile?.selectedLocation ?: "الموقع الحالي",
                 isSubmitting = isSubmittingOrder,
                 onBack = { navController.popBackStack() },
-                onConfirmOrder = { method, last4, onSuccess ->
+                onConfirmOrder = { method, last4, streetAddress, contactPhone, hasPrescription, rxAttached, onSuccess ->
                     viewModel.placeOrder(
                         paymentMethod = method,
                         cartItems = cartItems,
                         deliveryLocation = profile?.selectedLocation ?: "الموقع الحالي",
                         cardLast4 = last4,
+                        deliveryAddress = streetAddress,
+                        contactPhone = contactPhone,
+                        hasPrescription = hasPrescription,
+                        prescriptionAttached = rxAttached,
                         onSuccess = onSuccess
                     )
+                },
+                onTrackOrder = {
+                    navController.navigate(PharmacyRoutes.ORDERS) {
+                        popUpTo(PharmacyRoutes.HOME)
+                    }
                 },
                 onOrderCompleteGoHome = {
                     navController.navigate(PharmacyRoutes.HOME) {
                         popUpTo(PharmacyRoutes.HOME) { inclusive = true }
                     }
                 }
+            )
+        }
+
+        composable(PharmacyRoutes.ORDERS) {
+            OrdersScreen(
+                ordersState = ordersState,
+                onBack = { navController.popBackStack() },
+                onUpdateOrderStatus = viewModel::updateOrderStatus,
+                onReorderOrder = { order ->
+                    viewModel.reorderOrder(order) {
+                        navController.navigate(PharmacyRoutes.CART)
+                    }
+                },
+                onBrowseProducts = {
+                    navController.navigate(PharmacyRoutes.searchRoute("all"))
+                },
+                onRetry = viewModel::retryAll
             )
         }
     }

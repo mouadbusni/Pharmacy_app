@@ -26,6 +26,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Surface
@@ -36,8 +37,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -135,12 +138,27 @@ internal fun CartItemRow(
                         }
                     }
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = strings.formatPrice(item.priceUsd * item.quantity),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = TextPrimary,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = strings.formatPrice(item.priceUsd * item.quantity),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = if (displayProd.hasDiscount) ForestGreen else TextPrimary,
+                            fontWeight = FontWeight.Bold
+                        )
+                        val oldUnit = displayProd.originalPriceUsd
+                        if (displayProd.hasDiscount && oldUnit != null) {
+                            Text(
+                                text = strings.formatPrice(oldUnit * item.quantity),
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    textDecoration = TextDecoration.LineThrough
+                                ),
+                                color = TextSecondary
+                            )
+                        }
+                    }
                 }
             }
 
@@ -219,7 +237,8 @@ internal fun CartItemRow(
 internal fun CartSummaryCard(
     subtotal: Double,
     deliveryFee: Double,
-    total: Double
+    total: Double,
+    savings: Double = 0.0
 ) {
     val strings = LocalAppStrings.current
     Surface(
@@ -233,6 +252,14 @@ internal fun CartSummaryCard(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             SummaryRow(label = strings.subtotalLabel, value = strings.formatPrice(subtotal))
+            if (savings > 0.0) {
+                SummaryRow(
+                    label = strings.youSaveLabel,
+                    value = "-${strings.formatPrice(savings)}",
+                    highlight = false,
+                    accentValue = true
+                )
+            }
             SummaryRow(label = strings.deliveryLabel, value = strings.formatPrice(deliveryFee))
             Box(
                 modifier = Modifier
@@ -250,7 +277,12 @@ internal fun CartSummaryCard(
 }
 
 @Composable
-private fun SummaryRow(label: String, value: String, highlight: Boolean = false) {
+private fun SummaryRow(
+    label: String,
+    value: String,
+    highlight: Boolean = false,
+    accentValue: Boolean = false
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -265,7 +297,7 @@ private fun SummaryRow(label: String, value: String, highlight: Boolean = false)
         Text(
             text = value,
             style = if (highlight) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
-            color = if (highlight) ForestGreen else TextPrimary,
+            color = if (highlight || accentValue) ForestGreen else TextPrimary,
             fontWeight = FontWeight.Bold
         )
     }
@@ -325,6 +357,7 @@ internal fun PaymentMethodOption(
 @Composable
 internal fun CheckoutSuccessDialog(
     localizedDeliveryLocation: String,
+    onTrackOrder: () -> Unit,
     onDone: () -> Unit
 ) {
     val strings = LocalAppStrings.current
@@ -357,10 +390,19 @@ internal fun CheckoutSuccessDialog(
         },
         confirmButton = {
             Button(
-                onClick = onDone,
-                colors = ButtonDefaults.buttonColors(containerColor = ForestGreen)
+                onClick = onTrackOrder,
+                colors = ButtonDefaults.buttonColors(containerColor = ForestGreen),
+                modifier = Modifier.testTag("checkout_track_order_btn")
             ) {
-                Text(strings.backToHome, color = PureWhite)
+                Text(strings.trackOrderCta, color = PureWhite)
+            }
+        },
+        dismissButton = {
+            OutlinedButton(
+                onClick = onDone,
+                border = BorderStroke(1.dp, BorderSubtle)
+            ) {
+                Text(strings.backToHome, color = TextPrimary)
             }
         }
     )

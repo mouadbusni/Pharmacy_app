@@ -103,7 +103,7 @@ internal val medicationProducts = listOf(
         categoryId = "vitamins",
         categoryAr = "الفيتامينات والهضم",
         categoryEn = "Vitamins & GI",
-        priceUsd = 45.0,
+        priceUsd = 36.0,
         rating = 4.8,
         reviewCount = 164,
         deliveryTimeAr = "التوصيل خلال 30 دقيقة",
@@ -116,7 +116,9 @@ internal val medicationProducts = listOf(
         safetyNoteAr = "متاح بدون وصفة طبية (OTC). التزم بقرص واحد يومياً مع شرب كمية كافية من الماء، واستشر الطبيب في حال وجود حصوات كلوية.",
         safetyNoteEn = "Available OTC. Stick to one tablet daily with plenty of water; check with a doctor if prone to kidney stones.",
         isBestSeller = true,
-        packagingStyle = PackagingStyle.VITAC_CITRUS
+        packagingStyle = PackagingStyle.VITAC_CITRUS,
+        originalPriceUsd = 45.0,
+        discountPercent = 20
     ),
     Product(
         id = "prod_ventoline",
@@ -273,5 +275,33 @@ internal val medicationProducts = listOf(
         safetyNoteEn = "Prescription required. Ophthalmic tetracycline ointment; pregnancy or nursing status may restrict tetracyclines—avoid touching the tube tip and consult your doctor.",
         isBestSeller = false,
         packagingStyle = PackagingStyle.AUREOMYCINE_EMERALD
+    ),
+    Product(
+        id = "prod_magneb6",
+        nameAr = "ماغني-ب6 بلس (Magné-B6 Vitality)",
+        nameEn = "Magné-B6 Vitality & Immunity",
+        subtitleAr = "ماغنيسيوم + فيتامين B6 لمكافحة التعب",
+        subtitleEn = "Magnesium + B6 Energy • 30 Tablets",
+        descriptionAr = "مكمل غذائي متوازن يجمع بين الماغنيسيوم وفيتامين B6 لتخفيف الإرهاق العصبي والعضلي ودعم النشاط اليومي.",
+        descriptionEn = "Balanced Magnesium and Vitamin B6 supplement supporting muscle recovery, calm energy, and daily stress resilience.",
+        categoryId = "vitamins",
+        categoryAr = "الفيتامينات والهضم",
+        categoryEn = "Vitamins & GI",
+        priceUsd = 60.0,
+        rating = 4.8,
+        reviewCount = 112,
+        deliveryTimeAr = "التوصيل خلال 30 دقيقة",
+        deliveryTimeEn = "Delivery in 30 mins",
+        dosageMorningEvening = "قرصان يومياً",
+        dosageMorningEveningEn = "2 Tablets Daily",
+        dosageMealTiming = "أثناء الوجبة الرئيسية",
+        dosageMealTimingEn = "With Main Meal",
+        requiresPrescription = false,
+        safetyNoteAr = "مكمل متاح بدون وصفة (OTC). يُحفظ بعيداً عن متناول الأطفال ولا يُتجاوز المقدار اليومي الموصى به.",
+        safetyNoteEn = "Available OTC. Keep out of reach of children and do not exceed the recommended daily dose.",
+        isBestSeller = true,
+        packagingStyle = PackagingStyle.VITAC_CITRUS,
+        originalPriceUsd = 75.0,
+        discountPercent = 20
     )
 )

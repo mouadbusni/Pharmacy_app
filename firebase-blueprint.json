@@ -149,6 +149,26 @@
           "type": "string",
           "description": "Optional last 4 digits for card payments"
         },
+        "deliveryAddress": {
+          "type": "string",
+          "description": "Optional street and landmark delivery address"
+        },
+        "contactPhone": {
+          "type": "string",
+          "description": "Optional recipient phone number"
+        },
+        "hasPrescription": {
+          "type": "boolean",
+          "description": "Whether the order includes prescription-only items"
+        },
+        "prescriptionAttached": {
+          "type": "boolean",
+          "description": "Whether a prescription photo was attached at checkout"
+        },
+        "itemsSummary": {
+          "type": "string",
+          "description": "Compact SKU:qty summary for order display and reorder"
+        },
         "createdAt": {
           "type": "string",
           "format": "date-time",
@@ -204,6 +224,14 @@
         "text": {
           "type": "string",
           "description": "Message body text"
+        },
+        "attachmentUri": {
+          "type": "string",
+          "description": "Optional picked prescription photo URI"
+        },
+        "attachmentLabel": {
+          "type": "string",
+          "description": "Optional attachment label shown alongside thumbnail"
         },
         "createdAt": {
           "type": "string",

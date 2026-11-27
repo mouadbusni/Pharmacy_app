@@ -65,6 +65,11 @@ service cloud.firestore {
              data.status in ['confirmed', 'preparing', 'delivering', 'delivered', 'cancelled'] &&
              data.deliveryLocation is string && data.deliveryLocation.size() >= 1 && data.deliveryLocation.size() <= 160 &&
              (!('cardLast4' in data) || (data.cardLast4 is string && data.cardLast4.size() <= 4)) &&
+             (!('deliveryAddress' in data) || (data.deliveryAddress is string && data.deliveryAddress.size() <= 200)) &&
+             (!('contactPhone' in data) || (data.contactPhone is string && data.contactPhone.size() <= 32)) &&
+             (!('hasPrescription' in data) || data.hasPrescription is bool) &&
+             (!('prescriptionAttached' in data) || data.prescriptionAttached is bool) &&
+             (!('itemsSummary' in data) || (data.itemsSummary is string && data.itemsSummary.size() <= 400)) &&
              data.createdAt is timestamp && data.createdAt <= request.time &&
              data.updatedAt is timestamp && data.updatedAt <= request.time;
     }
@@ -80,6 +85,8 @@ service cloud.firestore {
              data.pharmacyId is string && data.pharmacyId == pharmacyId && isValidId(data.pharmacyId) &&
              data.senderType in ['USER', 'PHARMACY'] &&
              data.text is string && data.text.size() >= 1 && data.text.size() <= 1000 &&
+             (!('attachmentUri' in data) || (data.attachmentUri is string && data.attachmentUri.size() <= 500)) &&
+             (!('attachmentLabel' in data) || (data.attachmentLabel is string && data.attachmentLabel.size() <= 120)) &&
              data.createdAt is timestamp && data.createdAt <= request.time;
     }
 
@@ -152,7 +159,7 @@ service cloud.firestore {
                          incoming().userId == request.auth.uid &&
                          incoming().status == 'confirmed' &&
                          incoming().keys().hasAll(['userId', 'paymentMethod', 'subtotalUsd', 'deliveryUsd', 'totalUsd', 'itemCount', 'status', 'deliveryLocation', 'createdAt', 'updatedAt']) &&
-                         incoming().keys().hasOnly(['userId', 'paymentMethod', 'subtotalUsd', 'deliveryUsd', 'totalUsd', 'itemCount', 'status', 'deliveryLocation', 'cardLast4', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'paymentMethod', 'subtotalUsd', 'deliveryUsd', 'totalUsd', 'itemCount', 'status', 'deliveryLocation', 'cardLast4', 'deliveryAddress', 'contactPhone', 'hasPrescription', 'prescriptionAttached', 'itemsSummary', 'createdAt', 'updatedAt']) &&
                          isValidPharmacyOrder(incoming());
 
         allow update: if isOwner(userId) &&
@@ -194,7 +201,7 @@ service cloud.firestore {
                          isValidId(messageId) &&
                          incoming().userId == request.auth.uid &&
                          incoming().keys().hasAll(['userId', 'pharmacyId', 'senderType', 'text', 'createdAt']) &&
-                         incoming().keys().hasOnly(['userId', 'pharmacyId', 'senderType', 'text', 'createdAt']) &&
+                         incoming().keys().hasOnly(['userId', 'pharmacyId', 'senderType', 'text', 'attachmentUri', 'attachmentLabel', 'createdAt']) &&
                          isValidChatMessage(incoming(), pharmacyId);
 
         allow update: if false;

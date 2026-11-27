@@ -45,6 +45,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.example.data.catalog.PharmacyCatalog
 import com.example.data.model.Product
@@ -61,6 +62,8 @@ import com.example.ui.theme.NeutralBackground
 import com.example.ui.theme.PureWhite
 import com.example.ui.theme.StatusClosedBg
 import com.example.ui.theme.StatusClosedRed
+import com.example.ui.theme.StatusDutyAmber
+import com.example.ui.theme.StatusDutyBg
 import com.example.ui.theme.StatusOpenBg
 import com.example.ui.theme.StatusOpenGreen
 import com.example.ui.theme.TextPrimary
@@ -236,12 +239,40 @@ fun ProductDetailScreen(
                             )
                         }
                         Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            text = strings.formatPrice(product.priceUsd),
-                            style = MaterialTheme.typography.headlineMedium,
-                            color = TextPrimary,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Column(horizontalAlignment = Alignment.End) {
+                            if (product.hasDiscount) {
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = StatusDutyBg,
+                                    border = BorderStroke(0.8.dp, StatusDutyAmber.copy(alpha = 0.35f))
+                                ) {
+                                    Text(
+                                        text = "-${product.discountPercent}%",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = StatusDutyAmber,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(2.dp))
+                            }
+                            Text(
+                                text = strings.formatPrice(product.priceUsd),
+                                style = MaterialTheme.typography.headlineMedium,
+                                color = if (product.hasDiscount) ForestGreen else TextPrimary,
+                                fontWeight = FontWeight.Bold
+                            )
+                            val oldPrice = product.originalPriceUsd
+                            if (product.hasDiscount && oldPrice != null) {
+                                Text(
+                                    text = strings.formatPrice(oldPrice),
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        textDecoration = TextDecoration.LineThrough
+                                    ),
+                                    color = TextSecondary
+                                )
+                            }
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))

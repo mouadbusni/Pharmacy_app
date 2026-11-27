@@ -41,12 +41,14 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.R
 import com.example.data.model.PackagingStyle
 import com.example.data.model.Pharmacy
+import com.example.data.model.PharmacyStockStatus
 import com.example.data.model.Product
 import com.example.ui.theme.BorderSubtle
 import com.example.ui.theme.ForestGreen
@@ -107,7 +109,8 @@ fun ProductCard(
     onCardClick: () -> Unit,
     onAddClick: () -> Unit,
     onToggleFavorite: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    stockStatus: PharmacyStockStatus? = null
 ) {
     val strings = LocalAppStrings.current
     Card(
@@ -169,6 +172,24 @@ fun ProductCard(
                         modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
                     )
                 }
+                if (product.hasDiscount) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = StatusDutyBg,
+                        border = BorderStroke(0.8.dp, StatusDutyAmber.copy(alpha = 0.35f)),
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(6.dp)
+                    ) {
+                        Text(
+                            text = "-${product.discountPercent}%",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = StatusDutyAmber,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -181,6 +202,29 @@ fun ProductCard(
                 overflow = TextOverflow.Ellipsis
             )
 
+            if (stockStatus != null) {
+                Spacer(modifier = Modifier.height(4.dp))
+                val (stockBg, stockFg, stockText) = when (stockStatus) {
+                    PharmacyStockStatus.IN_STOCK -> Triple(StatusOpenBg, StatusOpenGreen, strings.inStockLabel)
+                    PharmacyStockStatus.LOW_STOCK -> Triple(StatusDutyBg, StatusDutyAmber, strings.lowStockLabel)
+                    PharmacyStockStatus.RESTOCKING -> Triple(NeutralBackground, TextSecondary, strings.restockingLabel)
+                }
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = stockBg
+                ) {
+                    Text(
+                        text = stockText,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = stockFg,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                    )
+                }
+            }
+
             Spacer(modifier = Modifier.height(6.dp))
 
             Row(
@@ -188,7 +232,7 @@ fun ProductCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Bottom
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             imageVector = Icons.Filled.Star,
@@ -205,12 +249,29 @@ fun ProductCard(
                         )
                     }
                     Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = strings.formatPrice(product.priceUsd),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = TextPrimary,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        Text(
+                            text = strings.formatPrice(product.priceUsd),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = if (product.hasDiscount) ForestGreen else TextPrimary,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1
+                        )
+                        val oldPrice = product.originalPriceUsd
+                        if (product.hasDiscount && oldPrice != null) {
+                            Text(
+                                text = strings.formatPrice(oldPrice),
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    textDecoration = TextDecoration.LineThrough
+                                ),
+                                color = TextSecondary,
+                                maxLines = 1
+                            )
+                        }
+                    }
                 }
 
                 Box(
@@ -343,17 +404,37 @@ fun PharmacyListCard(
                         pharmacy.isAlways24h -> strings.schedule24h
                         else -> strings.scheduleDayDuty
                     }
-                    Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = badgeBg
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text(
-                            text = "• $badgeLabel",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = badgeFg,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                        )
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = badgeBg
+                        ) {
+                            Text(
+                                text = "• $badgeLabel",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = badgeFg,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                            )
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Filled.Star,
+                                contentDescription = strings.ratingLabel,
+                                tint = WarmGold,
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Spacer(modifier = Modifier.width(2.dp))
+                            Text(
+                                text = pharmacy.rating.toString(),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextSecondary,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
                     }
                 }
             }

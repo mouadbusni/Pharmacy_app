@@ -2,6 +2,7 @@ package com.example.ui.screens
 
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -30,6 +31,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.StarHalf
 import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.Directions
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material.icons.filled.Star
@@ -49,6 +51,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -273,73 +276,44 @@ fun PharmacyProfileScreen(
                             Spacer(modifier = Modifier.height(16.dp))
 
                             Row(
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                modifier = Modifier.fillMaxWidth(0.88f)
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                Surface(
+                                PharmacyHeroActionChip(
+                                    label = strings.callUs,
+                                    icon = Icons.Filled.Call,
                                     onClick = {
                                         val intent = Intent(Intent.ACTION_DIAL).apply {
                                             data = Uri.parse("tel:${pharmacy.phoneNumber}")
                                         }
                                         runCatching { context.startActivity(intent) }
                                     },
-                                    shape = RoundedCornerShape(14.dp),
-                                    color = PureWhite.copy(alpha = 0.16f),
-                                    border = BorderStroke(1.dp, PureWhite.copy(alpha = 0.2f)),
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .minimumInteractiveComponentSize()
-                                        .height(48.dp)
-                                        .testTag("pharmacy_call_button")
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.Center
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Filled.Call,
-                                            contentDescription = strings.callUs,
-                                            tint = PureWhite,
-                                            modifier = Modifier.size(17.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(
-                                            text = strings.callUs,
-                                            style = MaterialTheme.typography.labelLarge,
-                                            color = PureWhite
-                                        )
-                                    }
-                                }
-
-                                Surface(
+                                    modifier = Modifier.weight(1f).testTag("pharmacy_call_button")
+                                )
+                                PharmacyHeroActionChip(
+                                    label = strings.messageUs,
+                                    icon = Icons.AutoMirrored.Filled.Chat,
                                     onClick = { onOpenChat(pharmacy) },
-                                    shape = RoundedCornerShape(14.dp),
-                                    color = PureWhite.copy(alpha = 0.16f),
-                                    border = BorderStroke(1.dp, PureWhite.copy(alpha = 0.2f)),
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .minimumInteractiveComponentSize()
-                                        .height(48.dp)
-                                        .testTag("pharmacy_chat_button")
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.Center
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.AutoMirrored.Filled.Chat,
-                                            contentDescription = strings.messageUs,
-                                            tint = PureWhite,
-                                            modifier = Modifier.size(17.dp)
+                                    modifier = Modifier.weight(1f).testTag("pharmacy_chat_button")
+                                )
+                                PharmacyHeroActionChip(
+                                    label = strings.getDirectionsLabel,
+                                    icon = Icons.Filled.Directions,
+                                    onClick = {
+                                        val encodedQuery = Uri.encode(pharmacy.mapsQuery())
+                                        val geoIntent = Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=$encodedQuery"))
+                                        val webIntent = Intent(
+                                            Intent.ACTION_VIEW,
+                                            Uri.parse("https://www.google.com/maps/search/?api=1&query=$encodedQuery")
                                         )
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(
-                                            text = strings.messageUs,
-                                            style = MaterialTheme.typography.labelLarge,
-                                            color = PureWhite
-                                        )
-                                    }
-                                }
+                                        val opened = runCatching { context.startActivity(geoIntent) }.isSuccess ||
+                                            runCatching { context.startActivity(webIntent) }.isSuccess
+                                        if (!opened) {
+                                            Toast.makeText(context, strings.mapsUnavailableToast, Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1f).testTag("pharmacy_directions_button")
+                                )
                             }
                         }
                     }
@@ -396,6 +370,7 @@ fun PharmacyProfileScreen(
                         ProductCard(
                             product = prod,
                             isFavorite = isFav,
+                            stockStatus = PharmacyCatalog.stockStatusFor(pharmacy, prod),
                             onCardClick = { onOpenProduct(prod) },
                             onAddClick = { onAddToCart(prod) },
                             onToggleFavorite = { onToggleFavorite(prod, isFav) },
@@ -441,6 +416,45 @@ fun PharmacyProfileScreen(
                     fontWeight = FontWeight.Bold
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun PharmacyHeroActionChip(
+    label: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(14.dp),
+        color = PureWhite.copy(alpha = 0.16f),
+        border = BorderStroke(1.dp, PureWhite.copy(alpha = 0.2f)),
+        modifier = modifier
+            .minimumInteractiveComponentSize()
+            .height(48.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+            modifier = Modifier.padding(horizontal = 6.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = PureWhite,
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = PureWhite,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }

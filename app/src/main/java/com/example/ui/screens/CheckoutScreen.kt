@@ -1,5 +1,8 @@
 package com.example.ui.screens
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -35,6 +38,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,7 +49,7 @@ import androidx.compose.ui.unit.dp
 import com.example.data.catalog.PharmacyCatalog
 import com.example.data.model.CartItem
 import com.example.ui.components.BackCircleButton
-import com.example.ui.components.HeaderCircleIconButton
+import com.example.ui.components.HeaderBadgeIndicator
 import com.example.ui.theme.BorderSubtle
 import com.example.ui.theme.ForestGreen
 import com.example.ui.theme.LocalAppStrings
@@ -60,18 +64,44 @@ fun CheckoutScreen(
     deliveryLocation: String,
     isSubmitting: Boolean,
     onBack: () -> Unit,
-    onConfirmOrder: (paymentMethod: String, cardLast4: String?, onSuccess: () -> Unit) -> Unit,
+    onConfirmOrder: (
+        paymentMethod: String,
+        cardLast4: String?,
+        deliveryAddress: String,
+        contactPhone: String,
+        hasPrescription: Boolean,
+        prescriptionAttached: Boolean,
+        onSuccess: () -> Unit
+    ) -> Unit,
+    onTrackOrder: () -> Unit,
     onOrderCompleteGoHome: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val strings = LocalAppStrings.current
-    var selectedMethod by remember { mutableStateOf("visa") }
+    var selectedMethod by rememberSaveable { mutableStateOf("visa") }
+    var streetAddress by rememberSaveable { mutableStateOf("") }
+    var phoneDigits by rememberSaveable { mutableStateOf("") }
+    var rxPhotoUri by rememberSaveable { mutableStateOf<String?>(null) }
     var holderName by remember { mutableStateOf("") }
     var cardDigits by remember { mutableStateOf("") }
     var expiryDigits by remember { mutableStateOf("") }
     var cvvDigits by remember { mutableStateOf("") }
     var validationAttempted by remember { mutableStateOf(false) }
     var showSuccessDialog by remember { mutableStateOf(false) }
+
+    val rxPhotoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            rxPhotoUri = uri.toString()
+        }
+    }
+
+    val hasPrescription = remember(cartItems) {
+        cartItems.any { item ->
+            PharmacyCatalog.products.firstOrNull { it.id == item.productId }?.requiresPrescription == true
+        }
+    }
 
     val formattedCardNumber = remember(cardDigits) {
         cardDigits.chunked(4).joinToString(" ")
@@ -81,6 +111,9 @@ fun CheckoutScreen(
         else "${expiryDigits.take(2)}/${expiryDigits.drop(2)}"
     }
 
+    val isAddressValid = streetAddress.trim().length >= 4
+    val isPhoneValid = phoneDigits.count { it.isDigit() } >= 9
+    val isRxValid = !hasPrescription || !rxPhotoUri.isNullOrBlank()
     val isHolderValid = holderName.trim().length >= 2
     val isCardValid = cardDigits.length == 16
     val expiryMonth = expiryDigits.take(2).toIntOrNull() ?: 0
@@ -118,8 +151,7 @@ fun CheckoutScreen(
                     style = MaterialTheme.typography.headlineSmall,
                     color = TextPrimary
                 )
-                HeaderCircleIconButton(
-                    onClick = {},
+                HeaderBadgeIndicator(
                     contentDescription = strings.orderTotalDesc,
                     badgeCount = cartItems.sumOf { it.quantity }.toInt()
                 ) {
@@ -139,6 +171,33 @@ fun CheckoutScreen(
                     .padding(horizontal = 18.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                CheckoutOrderSummaryCard(
+                    cartItems = cartItems,
+                    total = total
+                )
+
+                CheckoutDeliveryFields(
+                    streetAddress = streetAddress,
+                    onStreetAddressChange = { streetAddress = it },
+                    phoneDigits = phoneDigits,
+                    onPhoneDigitsChange = { phoneDigits = it },
+                    validationAttempted = validationAttempted,
+                    isAddressValid = isAddressValid,
+                    isPhoneValid = isPhoneValid
+                )
+
+                if (hasPrescription) {
+                    CheckoutRxVerificationCard(
+                        rxPhotoUri = rxPhotoUri,
+                        validationAttempted = validationAttempted,
+                        onPickPhotoClick = {
+                            rxPhotoPickerLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                            )
+                        }
+                    )
+                }
+
                 Text(
                     text = strings.choosePaymentMethod,
                     style = MaterialTheme.typography.titleMedium,
@@ -164,10 +223,7 @@ fun CheckoutScreen(
                     badgeText = strings.cashLabel,
                     badgeColor = ForestGreen,
                     selected = selectedMethod == "cash",
-                    onClick = {
-                        selectedMethod = "cash"
-                        validationAttempted = false
-                    }
+                    onClick = { selectedMethod = "cash" }
                 )
 
                 if (selectedMethod != "cash") {
@@ -237,14 +293,21 @@ fun CheckoutScreen(
             ) {
                 Button(
                     onClick = {
-                        if (selectedMethod != "cash") {
-                            validationAttempted = true
-                            if (!isHolderValid || !isCardValid || !isExpiryValid || !isCvvValid) {
-                                return@Button
-                            }
+                        validationAttempted = true
+                        val cardFieldsOk = selectedMethod == "cash" ||
+                            (isHolderValid && isCardValid && isExpiryValid && isCvvValid)
+                        if (!isAddressValid || !isPhoneValid || !isRxValid || !cardFieldsOk) {
+                            return@Button
                         }
                         val last4 = if (selectedMethod == "cash") null else cardDigits.takeLast(4)
-                        onConfirmOrder(selectedMethod, last4) {
+                        onConfirmOrder(
+                            selectedMethod,
+                            last4,
+                            streetAddress.trim(),
+                            phoneDigits.trim(),
+                            hasPrescription,
+                            !rxPhotoUri.isNullOrBlank()
+                        ) {
                             showSuccessDialog = true
                         }
                     },
@@ -284,6 +347,10 @@ fun CheckoutScreen(
     if (showSuccessDialog) {
         CheckoutSuccessDialog(
             localizedDeliveryLocation = localizedDeliveryLocation,
+            onTrackOrder = {
+                showSuccessDialog = false
+                onTrackOrder()
+            },
             onDone = {
                 showSuccessDialog = false
                 onOrderCompleteGoHome()

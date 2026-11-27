@@ -1,18 +1,30 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddPhotoAlternate
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.HomeWork
+import androidx.compose.material.icons.filled.MedicalInformation
+import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
@@ -23,15 +35,28 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import com.example.data.catalog.PharmacyCatalog
+import com.example.data.model.CartItem
 import com.example.ui.theme.BorderSubtle
 import com.example.ui.theme.ForestGreen
 import com.example.ui.theme.LocalAppStrings
+import com.example.ui.theme.MintSoft
+import com.example.ui.theme.NeutralBackground
 import com.example.ui.theme.PureWhite
+import com.example.ui.theme.StatusClosedBg
+import com.example.ui.theme.StatusClosedRed
+import com.example.ui.theme.StatusOpenBg
+import com.example.ui.theme.StatusOpenGreen
+import com.example.ui.theme.TextPrimary
+import com.example.ui.theme.TextSecondary
 
 @Composable
 internal fun CheckoutCardPreview(
@@ -217,3 +242,227 @@ internal fun CheckoutCardFields(
         )
     }
 }
+
+@Composable
+internal fun CheckoutDeliveryFields(
+    streetAddress: String,
+    onStreetAddressChange: (String) -> Unit,
+    phoneDigits: String,
+    onPhoneDigitsChange: (String) -> Unit,
+    validationAttempted: Boolean,
+    isAddressValid: Boolean,
+    isPhoneValid: Boolean
+) {
+    val strings = LocalAppStrings.current
+    Text(
+        text = strings.deliveryDetailsTitle,
+        style = MaterialTheme.typography.titleMedium,
+        color = TextPrimary
+    )
+    OutlinedTextField(
+        value = streetAddress,
+        onValueChange = onStreetAddressChange,
+        label = { Text(strings.streetAddressLabel) },
+        placeholder = { Text(strings.streetAddressPlaceholder) },
+        leadingIcon = {
+            Icon(Icons.Filled.HomeWork, contentDescription = null, tint = ForestGreen)
+        },
+        isError = validationAttempted && !isAddressValid,
+        supportingText = if (validationAttempted && !isAddressValid) {
+            { Text(strings.errStreetAddress) }
+        } else null,
+        singleLine = true,
+        shape = RoundedCornerShape(14.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = ForestGreen,
+            unfocusedBorderColor = BorderSubtle
+        ),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("checkout_address_input")
+    )
+    OutlinedTextField(
+        value = phoneDigits,
+        onValueChange = { input ->
+            onPhoneDigitsChange(input.filter { it.isDigit() || it == '+' }.take(14))
+        },
+        label = { Text(strings.contactPhoneLabel) },
+        placeholder = { Text(strings.contactPhonePlaceholder) },
+        leadingIcon = {
+            Icon(Icons.Filled.Phone, contentDescription = null, tint = ForestGreen)
+        },
+        isError = validationAttempted && !isPhoneValid,
+        supportingText = if (validationAttempted && !isPhoneValid) {
+            { Text(strings.errContactPhone) }
+        } else null,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+        singleLine = true,
+        shape = RoundedCornerShape(14.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = ForestGreen,
+            unfocusedBorderColor = BorderSubtle
+        ),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("checkout_phone_input")
+    )
+}
+
+@Composable
+internal fun CheckoutRxVerificationCard(
+    rxPhotoUri: String?,
+    validationAttempted: Boolean,
+    onPickPhotoClick: () -> Unit
+) {
+    val strings = LocalAppStrings.current
+    val missingError = validationAttempted && rxPhotoUri.isNullOrBlank()
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        color = if (rxPhotoUri != null) StatusOpenBg else StatusClosedBg.copy(alpha = 0.72f),
+        border = BorderStroke(
+            1.dp,
+            when {
+                rxPhotoUri != null -> StatusOpenGreen.copy(alpha = 0.45f)
+                missingError -> StatusClosedRed
+                else -> StatusClosedRed.copy(alpha = 0.35f)
+            }
+        ),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = if (rxPhotoUri != null) Icons.Filled.CheckCircle else Icons.Filled.MedicalInformation,
+                    contentDescription = null,
+                    tint = if (rxPhotoUri != null) StatusOpenGreen else StatusClosedRed,
+                    modifier = Modifier.size(22.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = strings.rxVerificationTitle,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = if (rxPhotoUri != null) StatusOpenGreen else StatusClosedRed,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Text(
+                text = if (rxPhotoUri != null) strings.rxAttachedSuccess else strings.rxRequiredNotice,
+                style = MaterialTheme.typography.bodySmall,
+                color = TextPrimary
+            )
+            if (rxPhotoUri != null) {
+                AsyncImage(
+                    model = rxPhotoUri,
+                    contentDescription = strings.rxAttachedSuccess,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(124.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                )
+            }
+            OutlinedButton(
+                onClick = onPickPhotoClick,
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = ForestGreen),
+                border = BorderStroke(1.dp, ForestGreen.copy(alpha = 0.5f)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("checkout_attach_rx_button")
+            ) {
+                Icon(Icons.Filled.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = if (rxPhotoUri != null) strings.changePhoto else strings.rxAttachHint,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            if (missingError) {
+                Text(
+                    text = strings.errPrescriptionRequired,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = StatusClosedRed
+                )
+            }
+        }
+    }
+}
+
+@Composable
+internal fun CheckoutOrderSummaryCard(
+    cartItems: List<CartItem>,
+    total: Double
+) {
+    val strings = LocalAppStrings.current
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        color = NeutralBackground,
+        border = BorderStroke(1.dp, BorderSubtle),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = strings.orderSummaryTitle,
+                style = MaterialTheme.typography.titleSmall,
+                color = TextPrimary,
+                fontWeight = FontWeight.Bold
+            )
+            cartItems.forEach { item ->
+                val prod = PharmacyCatalog.products.firstOrNull { it.id == item.productId }
+                val name = prod?.localizedName(strings.isEnglish) ?: item.productName
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "${item.quantity}× $name",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = strings.formatPrice(item.priceUsd * item.quantity),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextPrimary,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(BorderSubtle)
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = strings.totalLabel,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = TextPrimary,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = strings.formatPrice(total),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = ForestGreen,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}
+

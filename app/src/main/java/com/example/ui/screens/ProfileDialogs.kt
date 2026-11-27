@@ -59,6 +59,7 @@ internal fun ProfileSettingsDialog(
     notificationsEnabled: Boolean,
     defaultLocDisplay: String,
     onToggleNotifications: (Boolean) -> Unit,
+    onChangeNeighborhood: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val strings = LocalAppStrings.current
@@ -94,117 +95,41 @@ internal fun ProfileSettingsDialog(
                         )
                     )
                 }
-                Text(
-                    text = "${strings.defaultDeliveryAddress} $defaultLocDisplay",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = TextSecondary
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(strings.ok, color = ForestGreen, fontWeight = FontWeight.Bold)
-            }
-        }
-    )
-}
-
-@Composable
-internal fun ProfileOrdersHelpDialog(
-    ordersState: UiState<List<PharmacyOrder>>,
-    orders: List<PharmacyOrder>,
-    onRetry: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    val strings = LocalAppStrings.current
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = PureWhite,
-        title = {
-            Text(
-                text = strings.ordersHelpTitle,
-                style = MaterialTheme.typography.titleLarge,
-                color = TextPrimary
-            )
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                when (ordersState) {
-                    UiState.Loading -> LoadingStateCard()
-                    is UiState.Error -> ErrorStateCard(
-                        errorMessage = ordersState.message,
-                        onRetry = onRetry
-                    )
-                    is UiState.Success -> {
-                        if (orders.isEmpty()) {
-                            Text(
-                                text = strings.noOrdersYet,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = TextSecondary
-                            )
-                        } else {
-                            orders.take(4).forEach { order ->
-                                val methodLabel = when (order.paymentMethod) {
-                                    "visa" -> strings.visa
-                                    "mastercard" -> strings.mastercard
-                                    else -> strings.cashLabel
-                                }
-                                val locDisplay = PharmacyCatalog.localizeLocation(
-                                    order.deliveryLocation,
-                                    strings.isEnglish
-                                )
-                                Surface(
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = NeutralBackground,
-                                    border = BorderStroke(1.dp, BorderSubtle),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(10.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            modifier = Modifier.weight(1f)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.AutoMirrored.Filled.ReceiptLong,
-                                                contentDescription = null,
-                                                tint = ForestGreen,
-                                                modifier = Modifier.size(18.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Column {
-                                                Text(
-                                                    text = "${order.itemCount} ${strings.productsWord} • $methodLabel",
-                                                    style = MaterialTheme.typography.titleSmall,
-                                                    color = TextPrimary
-                                                )
-                                                Text(
-                                                    text = locDisplay,
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = TextSecondary
-                                                )
-                                            }
-                                        }
-                                        Text(
-                                            text = strings.formatPrice(order.totalUsd),
-                                            style = MaterialTheme.typography.titleSmall,
-                                            color = ForestGreen,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                }
-                            }
-                        }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = strings.defaultDeliveryAddress,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = TextSecondary
+                        )
+                        Text(
+                            text = defaultLocDisplay,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = TextPrimary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    OutlinedButton(
+                        onClick = {
+                            onDismiss()
+                            onChangeNeighborhood()
+                        },
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, ForestGreen)
+                    ) {
+                        Text(strings.changeNeighborhoodLabel, color = ForestGreen)
                     }
                 }
             }
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text(strings.close, color = ForestGreen, fontWeight = FontWeight.Bold)
+                Text(strings.ok, color = ForestGreen, fontWeight = FontWeight.Bold)
             }
         }
     )

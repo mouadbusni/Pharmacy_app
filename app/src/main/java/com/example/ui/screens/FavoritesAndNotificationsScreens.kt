@@ -24,12 +24,14 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -39,6 +41,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.data.catalog.PharmacyCatalog
+import com.example.data.model.AppNotification
 import com.example.data.model.FavoriteItem
 import com.example.data.model.NotificationTarget
 import com.example.data.model.Product
@@ -198,14 +201,19 @@ fun FavoritesScreen(
 
 @Composable
 fun NotificationsScreen(
+    notifications: List<AppNotification>,
     onBack: () -> Unit,
+    onMarkNotificationRead: (String) -> Unit,
+    onMarkAllRead: () -> Unit,
     onOpenPromoVitamins: () -> Unit,
-    onOpenChats: () -> Unit,
+    onOpenChats: (String?) -> Unit,
     onOpenPharmacies: () -> Unit,
+    onOpenOrders: () -> Unit,
     listState: LazyListState = rememberLazyListState(),
     modifier: Modifier = Modifier
 ) {
     val strings = LocalAppStrings.current
+    val hasUnread = remember(notifications) { notifications.any { it.unread } }
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
@@ -239,22 +247,48 @@ fun NotificationsScreen(
                         style = MaterialTheme.typography.headlineSmall,
                         color = TextPrimary
                     )
-                    Spacer(modifier = Modifier.size(48.dp))
+                    if (hasUnread) {
+                        TextButton(
+                            onClick = onMarkAllRead,
+                            modifier = Modifier.testTag("mark_all_notifications_read")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.DoneAll,
+                                contentDescription = null,
+                                tint = ForestGreen,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = strings.markAllRead,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = ForestGreen,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    } else {
+                        Spacer(modifier = Modifier.size(48.dp))
+                    }
                 }
             }
 
-            items(PharmacyCatalog.sampleNotifications, key = { it.id }) { notif ->
+            items(notifications, key = { it.id }) { notif ->
                 Surface(
                     onClick = {
+                        onMarkNotificationRead(notif.id)
                         when (notif.target) {
                             NotificationTarget.PROMO_VITAMINS -> onOpenPromoVitamins()
-                            NotificationTarget.CHATS -> onOpenChats()
+                            NotificationTarget.CHATS -> onOpenChats(notif.pharmacyId)
                             NotificationTarget.PHARMACIES -> onOpenPharmacies()
+                            NotificationTarget.ORDERS -> onOpenOrders()
                         }
                     },
                     shape = RoundedCornerShape(20.dp),
                     color = if (notif.unread) MintSoft else PureWhite,
-                    border = BorderStroke(1.dp, BorderSubtle),
+                    border = BorderStroke(
+                        1.dp,
+                        if (notif.unread) ForestGreen.copy(alpha = 0.25f) else BorderSubtle
+                    ),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 18.dp)
@@ -282,7 +316,8 @@ fun NotificationsScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
                                     text = notif.localizedTitle(strings.isEnglish),
@@ -292,6 +327,20 @@ fun NotificationsScreen(
                                     modifier = Modifier.weight(1f)
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
+                                if (notif.unread) {
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = ForestGreen
+                                    ) {
+                                        Text(
+                                            text = strings.unreadBadgeLabel,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = PureWhite,
+                                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                }
                                 Text(
                                     text = notif.localizedTime(strings.isEnglish),
                                     style = MaterialTheme.typography.labelSmall,

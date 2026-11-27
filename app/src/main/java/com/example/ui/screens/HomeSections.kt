@@ -56,6 +56,7 @@ import com.example.ui.theme.TextSecondary
 @Composable
 internal fun HomeTopBar(
     localizedSelectedLocation: String,
+    unreadNotificationsCount: Int,
     onOpenLocationSheet: () -> Unit,
     onOpenChats: () -> Unit,
     onOpenNotifications: () -> Unit
@@ -127,7 +128,7 @@ internal fun HomeTopBar(
             HeaderCircleIconButton(
                 onClick = onOpenNotifications,
                 contentDescription = strings.notifications,
-                badgeCount = 2,
+                badgeCount = unreadNotificationsCount,
                 modifier = Modifier.testTag("home_notifications_button")
             ) {
                 Icon(

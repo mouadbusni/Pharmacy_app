@@ -190,7 +190,57 @@ data class AppStrings(
     val noReleasesYetTitle: String,
     val noReleasesYetBody: String,
     val openPullRequests: String,
-    val copyAndOpenWorkflow: String
+    val copyAndOpenWorkflow: String,
+    // Discounts & Stock
+    val inStockLabel: String,
+    val lowStockLabel: String,
+    val restockingLabel: String,
+    // Pharmacy Filters & Directions
+    val filterOpenNowLabel: String,
+    val sortNearestLabel: String,
+    val sortTopRatedLabel: String,
+    val sort24hFirstLabel: String,
+    val getDirectionsLabel: String,
+    val mapsUnavailableToast: String,
+    // Checkout Delivery & Rx Verification
+    val deliveryDetailsTitle: String,
+    val streetAddressLabel: String,
+    val streetAddressPlaceholder: String,
+    val errStreetAddress: String,
+    val contactPhoneLabel: String,
+    val contactPhonePlaceholder: String,
+    val errContactPhone: String,
+    val rxVerificationTitle: String,
+    val rxRequiredNotice: String,
+    val rxAttachHint: String,
+    val rxAttachedSuccess: String,
+    val changePhoto: String,
+    val errPrescriptionRequired: String,
+    val orderSummaryTitle: String,
+    val youSaveLabel: String,
+    val trackOrderCta: String,
+    // Dedicated Orders Screen
+    val myOrdersTitle: String,
+    val ordersRowSubtitle: String,
+    val orderNumberPrefix: String,
+    val statusConfirmed: String,
+    val statusPreparing: String,
+    val statusDelivering: String,
+    val statusDelivered: String,
+    val statusCancelled: String,
+    val advanceStatusAction: String,
+    val cancelOrderAction: String,
+    val reorderAction: String,
+    val rxAttachedBadge: String,
+    val rxPendingBadge: String,
+    val emptyOrdersTitle: String,
+    val emptyOrdersBody: String,
+    // Notifications & Profile Identity
+    val markAllRead: String,
+    val unreadBadgeLabel: String,
+    val profileDefaultUserName: String,
+    val profileAdminSubtitle: String,
+    val changeNeighborhoodLabel: String
 ) {
     fun formatPrice(amount: Double): String = "${amount.toInt()} $currencySymbol"
 }

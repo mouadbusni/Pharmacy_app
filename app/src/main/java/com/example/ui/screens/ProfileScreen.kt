@@ -26,10 +26,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
-import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.SystemUpdate
@@ -45,14 +46,18 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.credentials.CredentialManager
+import coil.compose.AsyncImage
 import com.example.R
 import com.example.data.catalog.PharmacyCatalog
 import com.example.data.model.PharmacyOrder
@@ -77,10 +82,14 @@ fun ProfileScreen(
     profile: UserProfile?,
     ordersState: UiState<List<PharmacyOrder>>,
     isAdminMode: Boolean = false,
+    authDisplayName: String? = null,
+    authEmail: String? = null,
+    authPhotoUrl: String? = null,
     onBack: () -> Unit,
     onToggleLanguage: (String) -> Unit,
     onToggleNotifications: (Boolean) -> Unit,
-    onRetry: () -> Unit,
+    onUpdateLocation: (String) -> Unit = {},
+    onOpenOrders: () -> Unit = {},
     onSignedOut: () -> Unit,
     configuredRepo: String = "",
     updateState: AppUpdateState = AppUpdateState.Idle,
@@ -96,7 +105,7 @@ fun ProfileScreen(
     val credentialManager = remember(context) { CredentialManager.create(context) }
 
     var showSettingsDialog by remember { mutableStateOf(false) }
-    var showHelpOrdersDialog by remember { mutableStateOf(false) }
+    var showLocationSheet by remember { mutableStateOf(false) }
     var showAboutDialog by remember { mutableStateOf(false) }
     var showAppLinkDialog by remember { mutableStateOf(false) }
     var showUpdatesDialog by remember { mutableStateOf(false) }
@@ -110,10 +119,12 @@ fun ProfileScreen(
     val currentLanguage = profile?.language ?: "ar"
     val notificationsEnabled = profile?.notificationsEnabled ?: true
     val orders = (ordersState as? UiState.Success)?.data ?: emptyList()
+    val selectedLocation = profile?.selectedLocation ?: "الموقع الحالي"
     val defaultLocDisplay = PharmacyCatalog.localizeLocation(
-        profile?.selectedLocation ?: "الموقع الحالي",
+        selectedLocation,
         strings.isEnglish
     )
+    val resolvedName = authDisplayName?.takeIf { it.isNotBlank() } ?: strings.profileDefaultUserName
 
     BoxWithConstraints(
         modifier = modifier
@@ -194,12 +205,23 @@ fun ProfileScreen(
                         .border(4.dp, PureWhite, CircleShape)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Filled.Settings,
-                            contentDescription = strings.appPreferences,
-                            tint = ForestGreen,
-                            modifier = Modifier.size(42.dp)
-                        )
+                        if (!authPhotoUrl.isNullOrBlank()) {
+                            AsyncImage(
+                                model = authPhotoUrl,
+                                contentDescription = resolvedName,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(CircleShape)
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Filled.Person,
+                                contentDescription = resolvedName,
+                                tint = ForestGreen,
+                                modifier = Modifier.size(44.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -222,10 +244,27 @@ fun ProfileScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text(
-                        text = strings.appPreferences,
+                        text = resolvedName,
                         style = MaterialTheme.typography.headlineSmall,
-                        color = PureWhite
+                        color = PureWhite,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
+                    if (!authEmail.isNullOrBlank()) {
+                        Text(
+                            text = authEmail,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = PureWhite.copy(alpha = 0.85f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    } else if (isAdminMode) {
+                        Text(
+                            text = strings.profileAdminSubtitle,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = PureWhite.copy(alpha = 0.85f)
+                        )
+                    }
                     if (isAdminMode) {
                         Surface(
                             shape = RoundedCornerShape(10.dp),
@@ -257,10 +296,10 @@ fun ProfileScreen(
                     )
 
                     ProfileMenuRow(
-                        title = "${strings.ordersHelpPrefix} (${orders.size})",
-                        icon = Icons.AutoMirrored.Filled.HelpOutline,
-                        onClick = { showHelpOrdersDialog = true },
-                        modifier = Modifier.testTag("profile_help_row")
+                        title = "${strings.myOrdersTitle} (${orders.size})",
+                        icon = Icons.AutoMirrored.Filled.ReceiptLong,
+                        onClick = onOpenOrders,
+                        modifier = Modifier.testTag("profile_orders_row")
                     )
 
                     ProfileMenuRow(
@@ -338,16 +377,16 @@ fun ProfileScreen(
             notificationsEnabled = notificationsEnabled,
             defaultLocDisplay = defaultLocDisplay,
             onToggleNotifications = onToggleNotifications,
+            onChangeNeighborhood = { showLocationSheet = true },
             onDismiss = { showSettingsDialog = false }
         )
     }
 
-    if (showHelpOrdersDialog) {
-        ProfileOrdersHelpDialog(
-            ordersState = ordersState,
-            orders = orders,
-            onRetry = onRetry,
-            onDismiss = { showHelpOrdersDialog = false }
+    if (showLocationSheet) {
+        HomeDeliveryLocationSheet(
+            selectedLocation = selectedLocation,
+            onSelectLocation = onUpdateLocation,
+            onDismiss = { showLocationSheet = false }
         )
     }
 

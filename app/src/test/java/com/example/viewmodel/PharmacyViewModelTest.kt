@@ -2,6 +2,8 @@ package com.example.viewmodel
 
 import com.example.BuildConfig
 import com.example.data.catalog.PharmacyCatalog
+import com.example.data.model.NotificationTarget
+import com.example.data.notifications.NotificationPreferencesReader
 import com.example.data.repository.LocalAdminPharmacyRepository
 import com.example.data.update.AppUpdateInfo
 import com.example.data.update.AppUpdateState
@@ -54,6 +56,19 @@ class PharmacyViewModelTest {
 
         override suspend fun dismissReleaseTag(tagName: String) {
             _dismissedTag.value = tagName
+        }
+    }
+
+    private class FakeNotificationPreferencesReader : NotificationPreferencesReader {
+        private val _readIds = MutableStateFlow<Set<String>>(emptySet())
+        override val readIdsFlow: Flow<Set<String>> = _readIds
+
+        override suspend fun markRead(notificationId: String) {
+            _readIds.value = _readIds.value + notificationId
+        }
+
+        override suspend fun markAllRead(notificationIds: Collection<String>) {
+            _readIds.value = _readIds.value + notificationIds
         }
     }
 
@@ -168,5 +183,56 @@ class PharmacyViewModelTest {
             AppUpdateState.UpToDate("v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})"),
             viewModel.appUpdateState.value
         )
+    }
+
+    @Test
+    fun notificationsOrdersAndSmartChat_updateUnreadOrderStageReorderAndReplies() = runTest(testDispatcher) {
+        val notifStore = FakeNotificationPreferencesReader()
+        val viewModel = PharmacyViewModel(
+            repository = LocalAdminPharmacyRepository(),
+            currentUserId = "admin_session",
+            notificationPreferencesStore = notifStore
+        )
+        backgroundScope.launch { viewModel.notificationsState.collect {} }
+        backgroundScope.launch { viewModel.unreadNotificationsCount.collect {} }
+        backgroundScope.launch { viewModel.cartState.collect {} }
+        backgroundScope.launch { viewModel.ordersState.collect {} }
+
+        val initialUnread = viewModel.unreadNotificationsCount.value
+        assertTrue(initialUnread >= 2)
+        val firstUnreadId = viewModel.notificationsState.value.first { it.unread }.id
+        viewModel.markNotificationRead(firstUnreadId)
+        assertEquals(initialUnread - 1, viewModel.unreadNotificationsCount.value)
+
+        viewModel.markAllNotificationsRead()
+        assertEquals(0, viewModel.unreadNotificationsCount.value)
+
+        val cart = (viewModel.cartState.value as UiState.Success).data
+        var orderPlaced = false
+        viewModel.placeOrder(
+            paymentMethod = "cash",
+            cartItems = cart,
+            deliveryLocation = "الموقع الحالي",
+            cardLast4 = null,
+            deliveryAddress = "Rue Zero",
+            contactPhone = "0600000001",
+            onSuccess = { orderPlaced = true }
+        )
+        assertTrue(orderPlaced)
+        assertTrue(viewModel.notificationsState.value.any { it.target == NotificationTarget.ORDERS && it.unread })
+
+        val placedOrder = (viewModel.ordersState.value as UiState.Success).data.first()
+        viewModel.updateOrderStatus(placedOrder.id, "preparing")
+        assertEquals("preparing", (viewModel.ordersState.value as UiState.Success).data.first().status)
+
+        var reorderDone = false
+        viewModel.reorderOrder(placedOrder) { reorderDone = true }
+        assertTrue(reorderDone)
+        assertEquals(cart.size, (viewModel.cartState.value as UiState.Success).data.size)
+
+        val pharmacyId = PharmacyCatalog.pharmacies.first().id
+        backgroundScope.launch { viewModel.observePharmacyChat(pharmacyId).collect {} }
+        viewModel.sendMessage(pharmacyId, "هل الدواء متوفر؟", "content://photo/1", "rx.jpg")
+        assertTrue(viewModel.notificationsState.value.any { it.target == NotificationTarget.CHATS && it.unread })
     }
 }

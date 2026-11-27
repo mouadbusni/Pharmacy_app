@@ -311,7 +311,11 @@ class PharmacyRepository(
         paymentMethod: String,
         cartItems: List<CartItem>,
         deliveryLocation: String,
-        cardLast4: String?
+        cardLast4: String?,
+        deliveryAddress: String?,
+        contactPhone: String?,
+        hasPrescription: Boolean,
+        prescriptionAttached: Boolean
     ): Result<Unit> = executeWrite("users", OperationType.CREATE) { setPath ->
         val uid = requireSignedInUserId(auth)
         require(paymentMethod in listOf("mastercard", "visa", "cash"))
@@ -325,7 +329,11 @@ class PharmacyRepository(
             paymentMethod = paymentMethod,
             cartItems = cartItems,
             deliveryLocation = deliveryLocation,
-            cardLast4 = cardLast4
+            cardLast4 = cardLast4,
+            deliveryAddress = deliveryAddress,
+            contactPhone = contactPhone,
+            hasPrescription = hasPrescription,
+            prescriptionAttached = prescriptionAttached
         )
         orderRef.set(payload).await()
 
@@ -338,10 +346,32 @@ class PharmacyRepository(
         }
     }
 
-    override suspend fun sendChatMessage(pharmacyId: String, text: String): Result<Unit> =
+    override suspend fun updateOrderStatus(orderId: String, nextStatus: String): Result<Unit> =
+        executeWrite("users", OperationType.UPDATE) { setPath ->
+            val uid = requireSignedInUserId(auth)
+            require(orderId.isNotBlank())
+            require(nextStatus in listOf("confirmed", "preparing", "delivering", "delivered", "cancelled"))
+            val orderRef = db.collection("users").document(uid).collection("orders").document(orderId)
+            setPath(orderRef.path)
+            orderRef.update(
+                mapOf(
+                    "status" to nextStatus,
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+            ).await()
+        }
+
+    override suspend fun sendChatMessage(
+        pharmacyId: String,
+        text: String,
+        attachmentUri: String?,
+        attachmentLabel: String?,
+        senderType: String
+    ): Result<Unit> =
         executeWrite("users", OperationType.CREATE) { setPath ->
             val uid = requireSignedInUserId(auth)
             require(pharmacyId.matches(Regex("^[a-zA-Z0-9_\\-]+$")))
+            require(senderType == "USER" || senderType == "PHARMACY")
             val cleanText = text.trim().take(1000)
             require(cleanText.isNotEmpty())
             val msgCol = db.collection("users").document(uid)
@@ -350,7 +380,16 @@ class PharmacyRepository(
             val msgId = "m_${UUID.randomUUID().toString().replace("-", "").take(14)}"
             setPath("${msgCol.path}/$msgId")
             msgCol.document(msgId)
-                .set(FirestorePayloadBuilders.chatMessagePayload(uid, pharmacyId, "USER", cleanText))
+                .set(
+                    FirestorePayloadBuilders.chatMessagePayload(
+                        uid = uid,
+                        pharmacyId = pharmacyId,
+                        senderType = senderType,
+                        text = cleanText,
+                        attachmentUri = attachmentUri,
+                        attachmentLabel = attachmentLabel
+                    )
+                )
                 .await()
         }
 

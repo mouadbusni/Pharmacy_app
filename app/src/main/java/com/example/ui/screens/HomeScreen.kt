@@ -80,6 +80,7 @@ fun HomeScreen(
     updateState: AppUpdateState = AppUpdateState.Idle,
     onUpdateNow: (AppUpdateInfo) -> Unit = {},
     onDismissUpdate: (String) -> Unit = {},
+    unreadNotificationsCount: Int = 0,
     listState: LazyListState = rememberLazyListState(),
     modifier: Modifier = Modifier
 ) {
@@ -130,6 +131,7 @@ fun HomeScreen(
             item {
                 HomeTopBar(
                     localizedSelectedLocation = localizedSelectedLocation,
+                    unreadNotificationsCount = unreadNotificationsCount,
                     onOpenLocationSheet = { showLocationSheet = true },
                     onOpenChats = onOpenChats,
                     onOpenNotifications = onOpenNotifications

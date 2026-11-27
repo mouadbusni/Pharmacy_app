@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,12 +16,14 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MedicalInformation
 import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -29,6 +32,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -39,12 +43,14 @@ import com.example.data.catalog.PharmacyCatalog
 import com.example.data.model.CartItem
 import com.example.ui.components.BackCircleButton
 import com.example.ui.components.ErrorStateCard
-import com.example.ui.components.HeaderCircleIconButton
+import com.example.ui.components.HeaderBadgeIndicator
 import com.example.ui.components.LoadingStateCard
 import com.example.ui.theme.ForestGreen
 import com.example.ui.theme.LocalAppStrings
 import com.example.ui.theme.MintSoft
 import com.example.ui.theme.PureWhite
+import com.example.ui.theme.StatusClosedBg
+import com.example.ui.theme.StatusClosedRed
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 import com.example.viewmodel.UiState
@@ -63,6 +69,22 @@ fun CartScreen(
     val strings = LocalAppStrings.current
     val cartItems = (cartState as? UiState.Success)?.data ?: emptyList()
     val subtotal = cartItems.sumOf { it.priceUsd * it.quantity }
+    val savings = remember(cartItems) {
+        cartItems.sumOf { item ->
+            val prod = PharmacyCatalog.products.firstOrNull { it.id == item.productId }
+            val orig = prod?.originalPriceUsd
+            if (prod?.hasDiscount == true && orig != null && orig > item.priceUsd) {
+                (orig - item.priceUsd) * item.quantity
+            } else {
+                0.0
+            }
+        }
+    }
+    val hasRxItems = remember(cartItems) {
+        cartItems.any { item ->
+            PharmacyCatalog.products.firstOrNull { it.id == item.productId }?.requiresPrescription == true
+        }
+    }
     val deliveryFee = if (cartItems.isEmpty()) 0.0 else PharmacyCatalog.DELIVERY_FEE_MAD
     val total = subtotal + deliveryFee
 
@@ -94,8 +116,7 @@ fun CartScreen(
                     style = MaterialTheme.typography.headlineSmall,
                     color = TextPrimary
                 )
-                HeaderCircleIconButton(
-                    onClick = {},
+                HeaderBadgeIndicator(
                     contentDescription = strings.itemCountDesc,
                     badgeCount = cartItems.sumOf { it.quantity }.toInt()
                 ) {
@@ -208,10 +229,14 @@ fun CartScreen(
                                     .navigationBarsPadding(),
                                 verticalArrangement = Arrangement.spacedBy(16.dp)
                             ) {
+                                if (hasRxItems) {
+                                    CartRxBanner(strings.rxRequiredNotice)
+                                }
                                 CartSummaryCard(
                                     subtotal = subtotal,
                                     deliveryFee = deliveryFee,
-                                    total = total
+                                    total = total,
+                                    savings = savings
                                 )
                                 Button(
                                     onClick = onProceedCheckout,
@@ -245,12 +270,17 @@ fun CartScreen(
                                 )
                             }
 
+                            if (hasRxItems) {
+                                item { CartRxBanner(strings.rxRequiredNotice) }
+                            }
+
                             item {
                                 Spacer(modifier = Modifier.height(4.dp))
                                 CartSummaryCard(
                                     subtotal = subtotal,
                                     deliveryFee = deliveryFee,
-                                    total = total
+                                    total = total,
+                                    savings = savings
                                 )
                             }
                         }
@@ -281,6 +311,35 @@ fun CartScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun CartRxBanner(notice: String) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = StatusClosedBg,
+        border = BorderStroke(1.dp, StatusClosedRed.copy(alpha = 0.35f)),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Filled.MedicalInformation,
+                contentDescription = null,
+                tint = StatusClosedRed,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+            Text(
+                text = notice,
+                style = MaterialTheme.typography.bodySmall,
+                color = StatusClosedRed,
+                fontWeight = FontWeight.Medium
+            )
         }
     }
 }

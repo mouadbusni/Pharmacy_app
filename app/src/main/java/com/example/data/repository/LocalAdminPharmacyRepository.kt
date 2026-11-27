@@ -201,7 +201,11 @@ class LocalAdminPharmacyRepository : PharmacyDataSource {
         paymentMethod: String,
         cartItems: List<CartItem>,
         deliveryLocation: String,
-        cardLast4: String?
+        cardLast4: String?,
+        deliveryAddress: String?,
+        contactPhone: String?,
+        hasPrescription: Boolean,
+        prescriptionAttached: Boolean
     ): Result<Unit> {
         if (cartItems.isEmpty()) return Result.failure(IllegalArgumentException("Cart is empty"))
         val subtotal = cartItems.sumOf { it.priceUsd * it.quantity }
@@ -217,6 +221,11 @@ class LocalAdminPharmacyRepository : PharmacyDataSource {
             status = "confirmed",
             deliveryLocation = deliveryLocation,
             cardLast4 = cardLast4,
+            deliveryAddress = deliveryAddress?.trim()?.take(200)?.takeIf { it.isNotEmpty() },
+            contactPhone = contactPhone?.trim()?.take(32)?.takeIf { it.isNotEmpty() },
+            hasPrescription = hasPrescription,
+            prescriptionAttached = prescriptionAttached,
+            itemsSummary = PharmacyCatalog.formatOrderItemsSummary(cartItems),
             createdAt = Timestamp.now(),
             updatedAt = Timestamp.now()
         )
@@ -225,7 +234,28 @@ class LocalAdminPharmacyRepository : PharmacyDataSource {
         return Result.success(Unit)
     }
 
-    override suspend fun sendChatMessage(pharmacyId: String, text: String): Result<Unit> {
+    override suspend fun updateOrderStatus(orderId: String, nextStatus: String): Result<Unit> {
+        val allowed = listOf("confirmed", "preparing", "delivering", "delivered", "cancelled")
+        if (nextStatus !in allowed) return Result.failure(IllegalArgumentException("Invalid status"))
+        _orders.update { list ->
+            list.map { order ->
+                if (order.id == orderId && order.status != "delivered" && order.status != "cancelled") {
+                    order.copy(status = nextStatus, updatedAt = Timestamp.now())
+                } else {
+                    order
+                }
+            }
+        }
+        return Result.success(Unit)
+    }
+
+    override suspend fun sendChatMessage(
+        pharmacyId: String,
+        text: String,
+        attachmentUri: String?,
+        attachmentLabel: String?,
+        senderType: String
+    ): Result<Unit> {
         val clean = text.trim().take(1000)
         if (clean.isEmpty()) return Result.success(Unit)
         ensurePharmacyChatSeeded(pharmacyId)
@@ -233,8 +263,10 @@ class LocalAdminPharmacyRepository : PharmacyDataSource {
             id = "admin_m_${UUID.randomUUID().toString().take(8)}",
             userId = "admin_session",
             pharmacyId = pharmacyId,
-            senderType = "USER",
+            senderType = senderType,
             text = clean,
+            attachmentUri = attachmentUri?.trim()?.take(500)?.takeIf { it.isNotEmpty() },
+            attachmentLabel = attachmentLabel?.trim()?.take(120)?.takeIf { it.isNotEmpty() },
             createdAt = Timestamp.now()
         )
         _chats.update { map ->

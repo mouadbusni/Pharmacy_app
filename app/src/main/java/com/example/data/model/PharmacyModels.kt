@@ -30,6 +30,23 @@ enum class PharmacyScheduleFilter {
     DAY_DUTY
 }
 
+enum class PharmacyOpenFilter {
+    ALL,
+    OPEN_NOW
+}
+
+enum class PharmacySortOption {
+    NEAREST,
+    TOP_RATED,
+    OPEN_24H_FIRST
+}
+
+enum class PharmacyStockStatus {
+    IN_STOCK,
+    LOW_STOCK,
+    RESTOCKING
+}
+
 enum class PrescriptionFilter {
     ALL,
     OTC,
@@ -39,7 +56,8 @@ enum class PrescriptionFilter {
 enum class NotificationTarget {
     PROMO_VITAMINS,
     CHATS,
-    PHARMACIES
+    PHARMACIES,
+    ORDERS
 }
 
 data class PharmacyCategory(
@@ -75,8 +93,13 @@ data class Product(
     val safetyNoteAr: String,
     val safetyNoteEn: String,
     val isBestSeller: Boolean,
-    val packagingStyle: PackagingStyle
+    val packagingStyle: PackagingStyle,
+    val originalPriceUsd: Double? = null,
+    val discountPercent: Int = 0
 ) {
+    val hasDiscount: Boolean
+        get() = discountPercent > 0 && (originalPriceUsd ?: 0.0) > priceUsd
+
     fun localizedName(isEnglish: Boolean): String = if (isEnglish) nameEn else nameAr
     fun localizedSubtitle(isEnglish: Boolean): String = if (isEnglish) subtitleEn else subtitleAr
     fun localizedDescription(isEnglish: Boolean): String = if (isEnglish) descriptionEn else descriptionAr
@@ -110,6 +133,9 @@ data class Pharmacy(
     val lastMessageTime: String
 ) {
     val isAlways24h: Boolean get() = schedule == PharmacySchedule.ALWAYS_24H
+    fun distanceKmValue(): Double =
+        Regex("\\d+(?:\\.\\d+)?").find(distanceEn)?.value?.toDoubleOrNull() ?: 99.0
+    fun mapsQuery(): String = "$nameEn, $addressEn"
     fun localizedName(isEnglish: Boolean): String = if (isEnglish) nameEn else nameAr
     fun localizedArea(isEnglish: Boolean): String = if (isEnglish) areaEn else areaAr
     fun localizedAddress(isEnglish: Boolean): String = if (isEnglish) addressEn else addressAr
@@ -126,7 +152,8 @@ data class AppNotification(
     val timeAr: String,
     val timeEn: String,
     val unread: Boolean,
-    val target: NotificationTarget
+    val target: NotificationTarget,
+    val pharmacyId: String? = null
 ) {
     fun localizedTitle(isEnglish: Boolean): String = if (isEnglish) titleEn else titleAr
     fun localizedBody(isEnglish: Boolean): String = if (isEnglish) bodyEn else bodyAr
@@ -183,6 +210,11 @@ data class PharmacyOrder(
     val status: String = "confirmed",
     val deliveryLocation: String = "الموقع الحالي",
     val cardLast4: String? = null,
+    val deliveryAddress: String? = null,
+    val contactPhone: String? = null,
+    val hasPrescription: Boolean = false,
+    val prescriptionAttached: Boolean = false,
+    val itemsSummary: String? = null,
     @ServerTimestamp val createdAt: Timestamp? = null,
     @ServerTimestamp val updatedAt: Timestamp? = null
 )
@@ -204,5 +236,7 @@ data class ChatMessage(
     val pharmacyId: String = "",
     val senderType: String = "USER",
     val text: String = "",
+    val attachmentUri: String? = null,
+    val attachmentLabel: String? = null,
     @ServerTimestamp val createdAt: Timestamp? = null
 )

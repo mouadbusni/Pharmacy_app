@@ -27,5 +27,13 @@ class SaydaliyatiResourcesRobolectricTest {
     fun localizedStringsFormatCurrencyConsistently() {
         assertEquals("45 د.م.", ArabicStrings.formatPrice(45.0))
         assertEquals("45 MAD", EnglishStrings.formatPrice(45.0))
+        assertTrue(ArabicStrings.promoDiscount.contains("20"))
+        assertTrue(EnglishStrings.promoDiscount.contains("20"))
+        assertTrue(ArabicStrings.myOrdersTitle.isNotBlank())
+        assertTrue(EnglishStrings.myOrdersTitle.isNotBlank())
+        assertTrue(ArabicStrings.markAllRead.isNotBlank())
+        assertTrue(EnglishStrings.markAllRead.isNotBlank())
+        assertTrue(ArabicStrings.getDirectionsLabel.isNotBlank())
+        assertTrue(EnglishStrings.getDirectionsLabel.isNotBlank())
     }
 }

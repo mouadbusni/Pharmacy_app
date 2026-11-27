@@ -17,10 +17,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 import com.example.data.model.ChatMessage
 import com.example.data.model.Pharmacy
 import com.example.ui.components.PharmacyAvatarBadge
@@ -105,6 +108,7 @@ internal fun ChatPharmacyRowCard(
 @Composable
 internal fun ChatMessageBubble(message: ChatMessage) {
     val isPharmacy = message.senderType == "PHARMACY"
+    val strings = LocalAppStrings.current
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (isPharmacy) Arrangement.End else Arrangement.Start
@@ -119,12 +123,26 @@ internal fun ChatMessageBubble(message: ChatMessage) {
             color = if (isPharmacy) ForestGreen else ChatBubbleGray,
             modifier = Modifier.widthIn(max = 300.dp)
         ) {
-            Text(
-                text = message.text,
-                style = MaterialTheme.typography.bodyLarge,
-                color = if (isPharmacy) PureWhite else TextPrimary,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 11.dp)
-            )
+            Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                val attachmentUri = message.attachmentUri
+                if (!attachmentUri.isNullOrBlank()) {
+                    AsyncImage(
+                        model = attachmentUri,
+                        contentDescription = message.attachmentLabel ?: strings.attachPrescription,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(136.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+                Text(
+                    text = message.text,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = if (isPharmacy) PureWhite else TextPrimary
+                )
+            }
         }
     }
 }

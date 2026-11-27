@@ -35,8 +35,20 @@ interface PharmacyDataSource {
         paymentMethod: String,
         cartItems: List<CartItem>,
         deliveryLocation: String,
-        cardLast4: String?
+        cardLast4: String?,
+        deliveryAddress: String? = null,
+        contactPhone: String? = null,
+        hasPrescription: Boolean = false,
+        prescriptionAttached: Boolean = false
     ): Result<Unit>
 
-    suspend fun sendChatMessage(pharmacyId: String, text: String): Result<Unit>
+    suspend fun updateOrderStatus(orderId: String, nextStatus: String): Result<Unit>
+
+    suspend fun sendChatMessage(
+        pharmacyId: String,
+        text: String,
+        attachmentUri: String? = null,
+        attachmentLabel: String? = null,
+        senderType: String = "USER"
+    ): Result<Unit>
 }

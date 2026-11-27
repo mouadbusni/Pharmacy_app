@@ -33,6 +33,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.R
+import com.example.data.notifications.NotificationPreferencesStore
 import com.example.data.repository.LocalAdminPharmacyRepository
 import com.example.data.repository.PharmacyRepository
 import com.example.data.update.AppUpdateInfo
@@ -47,6 +48,9 @@ import com.example.ui.theme.LocalAppStrings
 import com.example.ui.theme.PureWhite
 import com.example.viewmodel.PharmacyViewModel
 import com.example.viewmodel.UiState
+import com.google.firebase.Firebase
+import com.google.firebase.FirebaseApp
+import com.google.firebase.auth.auth
 import com.google.firebase.firestore.FirebaseFirestore
 
 @Composable
@@ -63,6 +67,7 @@ internal fun AuthenticatedPharmacyApp(
                     "APPLICATION_KEY missing from CreationExtras"
                 }
                 val updateStore = UpdatePreferencesStore(app.applicationContext)
+                val notificationStore = NotificationPreferencesStore(app.applicationContext)
                 val repo = if (isAdminMode) {
                     LocalAdminPharmacyRepository()
                 } else {
@@ -73,13 +78,17 @@ internal fun AuthenticatedPharmacyApp(
                 PharmacyViewModel(
                     repository = repo,
                     currentUserId = currentUserId,
-                    updatePreferencesStore = updateStore
+                    updatePreferencesStore = updateStore,
+                    notificationPreferencesStore = notificationStore
                 )
             }
         }
     )
 
     val context = LocalContext.current
+    val currentAuthUser = remember(context, isAdminMode, currentUserId) {
+        if (isAdminMode || FirebaseApp.getApps(context).isEmpty()) null else Firebase.auth.currentUser
+    }
     val profileState by viewModel.profileState.collectAsStateWithLifecycle()
     val cartState by viewModel.cartState.collectAsStateWithLifecycle()
     val favoritesState by viewModel.favoritesState.collectAsStateWithLifecycle()
@@ -90,6 +99,8 @@ internal fun AuthenticatedPharmacyApp(
     val actionMessage by viewModel.actionMessage.collectAsStateWithLifecycle()
     val configuredRepo by viewModel.configuredRepo.collectAsStateWithLifecycle()
     val appUpdateState by viewModel.appUpdateState.collectAsStateWithLifecycle()
+    val notifications by viewModel.notificationsState.collectAsStateWithLifecycle()
+    val unreadNotificationsCount by viewModel.unreadNotificationsCount.collectAsStateWithLifecycle()
 
     val onLaunchUpdateDownload: (AppUpdateInfo) -> Unit = { info ->
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(info.apkDownloadUrl))
@@ -174,9 +185,14 @@ internal fun AuthenticatedPharmacyApp(
                         favoriteIds = favoriteIds,
                         ordersState = ordersState,
                         recentSearchesState = recentSearchesState,
+                        notifications = notifications,
+                        unreadNotificationsCount = unreadNotificationsCount,
                         selectedHomeCategory = selectedHomeCategory,
                         isSubmittingOrder = isSubmittingOrder,
                         isAdminMode = isAdminMode,
+                        authDisplayName = currentAuthUser?.displayName,
+                        authEmail = currentAuthUser?.email,
+                        authPhotoUrl = currentAuthUser?.photoUrl?.toString(),
                         configuredRepo = configuredRepo,
                         appUpdateState = appUpdateState,
                         onLaunchUpdateDownload = onLaunchUpdateDownload,

@@ -2,6 +2,9 @@ package com.example.ui.screens
 
 import android.content.Intent
 import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -70,7 +73,7 @@ fun LiveChatScreen(
     pharmacy: Pharmacy,
     chatState: UiState<List<ChatMessage>>,
     onBack: () -> Unit,
-    onSendMessage: (String) -> Unit,
+    onSendMessage: (text: String, attachmentUri: String?, attachmentLabel: String?) -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -78,6 +81,18 @@ fun LiveChatScreen(
     val context = LocalContext.current
     var messageInput by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
+
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            onSendMessage(
+                strings.attachPhotoMessage,
+                uri.toString(),
+                "prescription_photo.jpg"
+            )
+        }
+    }
 
     val messages = (chatState as? UiState.Success)?.data ?: emptyList()
 
@@ -208,7 +223,7 @@ fun LiveChatScreen(
         ) {
             items(strings.quickReplies) { quick ->
                 Surface(
-                    onClick = { onSendMessage(quick) },
+                    onClick = { onSendMessage(quick, null, null) },
                     shape = RoundedCornerShape(14.dp),
                     color = MintSoft,
                     border = BorderStroke(1.dp, BorderSubtle)
@@ -249,7 +264,7 @@ fun LiveChatScreen(
                         Surface(
                             onClick = {
                                 if (messageInput.isNotBlank()) {
-                                    onSendMessage(messageInput)
+                                    onSendMessage(messageInput, null, null)
                                     messageInput = ""
                                 }
                             },
@@ -294,8 +309,14 @@ fun LiveChatScreen(
                     )
 
                     IconButton(
-                        onClick = { onSendMessage(strings.attachPhotoMessage) },
-                        modifier = Modifier.minimumInteractiveComponentSize()
+                        onClick = {
+                            photoPickerLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                            )
+                        },
+                        modifier = Modifier
+                            .minimumInteractiveComponentSize()
+                            .testTag("chat_attach_photo_button")
                     ) {
                         Icon(
                             imageVector = Icons.Filled.CameraAlt,

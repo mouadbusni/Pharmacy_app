@@ -95,6 +95,51 @@ fun HeaderCircleIconButton(
 }
 
 @Composable
+fun HeaderBadgeIndicator(
+    contentDescription: String,
+    modifier: Modifier = Modifier,
+    badgeCount: Int = 0,
+    backgroundColor: Color = PureWhite,
+    icon: @Composable () -> Unit
+) {
+    Box(
+        modifier = modifier.size(48.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Surface(
+            shape = CircleShape,
+            color = backgroundColor,
+            shadowElevation = 1.dp,
+            border = BorderStroke(1.dp, BorderSubtle.copy(alpha = 0.7f)),
+            modifier = Modifier.size(42.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                icon()
+            }
+        }
+        if (badgeCount > 0) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = 2.dp, y = (-2).dp)
+                    .size(18.dp)
+                    .clip(CircleShape)
+                    .background(MintTeal),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = if (badgeCount > 9) "9+" else badgeCount.toString(),
+                    color = PureWhite,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}
+
+
+@Composable
 fun BackCircleButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
