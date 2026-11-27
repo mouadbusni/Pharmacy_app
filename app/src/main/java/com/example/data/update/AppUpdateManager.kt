@@ -37,27 +37,42 @@ sealed interface ReleaseCheckOutcome {
     data class NoReleasesYet(val repoSlug: String) : ReleaseCheckOutcome
 }
 
-class UpdatePreferencesStore(private val context: Context) {
+interface UpdatePreferencesReader {
+    val repoSlugFlow: Flow<String>
+    val dismissedTagFlow: Flow<String>
+    suspend fun saveRepoSlug(rawInput: String)
+    suspend fun dismissReleaseTag(tagName: String)
+}
+
+fun interface ReleaseLookup {
+    suspend fun fetchLatestRelease(
+        repoSlug: String,
+        installedVersionName: String,
+        installedVersionCode: Int
+    ): Result<ReleaseCheckOutcome>
+}
+
+class UpdatePreferencesStore(private val context: Context) : UpdatePreferencesReader {
 
     private val repoSlugKey = stringPreferencesKey("github_repo_slug")
     private val dismissedTagKey = stringPreferencesKey("dismissed_release_tag")
 
-    val repoSlugFlow: Flow<String> = context.updateDataStore.data.map { prefs ->
+    override val repoSlugFlow: Flow<String> = context.updateDataStore.data.map { prefs ->
         prefs[repoSlugKey] ?: DEFAULT_REPO_SLUG
     }
 
-    val dismissedTagFlow: Flow<String> = context.updateDataStore.data.map { prefs ->
+    override val dismissedTagFlow: Flow<String> = context.updateDataStore.data.map { prefs ->
         prefs[dismissedTagKey] ?: ""
     }
 
-    suspend fun saveRepoSlug(rawInput: String) {
+    override suspend fun saveRepoSlug(rawInput: String) {
         val normalized = normalizeRepoSlug(rawInput)
         context.updateDataStore.edit { prefs ->
             prefs[repoSlugKey] = normalized
         }
     }
 
-    suspend fun dismissReleaseTag(tagName: String) {
+    override suspend fun dismissReleaseTag(tagName: String) {
         context.updateDataStore.edit { prefs ->
             prefs[dismissedTagKey] = tagName
         }
@@ -72,6 +87,7 @@ class UpdatePreferencesStore(private val context: Context) {
                 .removePrefix("https://github.com/")
                 .removePrefix("http://github.com/")
                 .removePrefix("github.com/")
+                .trim('/')
                 .removeSuffix(".git")
                 .trim('/')
         }
@@ -83,9 +99,9 @@ class UpdatePreferencesStore(private val context: Context) {
     }
 }
 
-object GitHubReleaseChecker {
+object GitHubReleaseChecker : ReleaseLookup {
 
-    suspend fun fetchLatestRelease(
+    override suspend fun fetchLatestRelease(
         repoSlug: String,
         installedVersionName: String,
         installedVersionCode: Int
@@ -278,8 +294,12 @@ jobs:
             gradle :app:assembleRelease
             cp app/build/outputs/apk/release/app-release.apk Saydaliyati-v1.0.${'$'}{{ github.run_number }}.apk
           else
-            if [ ! -f debug.keystore ] && [ -f debug.keystore.base64 ]; then
-              base64 -d debug.keystore.base64 > debug.keystore
+            if [ ! -f debug.keystore ]; then
+              if [ -f debug.keystore.base64 ]; then
+                base64 -d debug.keystore.base64 > debug.keystore
+              else
+                keytool -genkeypair -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+              fi
             fi
             gradle :app:assembleDebug
             cp app/build/outputs/apk/debug/app-debug.apk Saydaliyati-v1.0.${'$'}{{ github.run_number }}.apk

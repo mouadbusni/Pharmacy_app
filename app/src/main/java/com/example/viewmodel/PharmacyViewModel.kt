@@ -16,6 +16,8 @@ import com.example.data.repository.PharmacyDataSource
 import com.example.data.update.AppUpdateState
 import com.example.data.update.GitHubReleaseChecker
 import com.example.data.update.ReleaseCheckOutcome
+import com.example.data.update.ReleaseLookup
+import com.example.data.update.UpdatePreferencesReader
 import com.example.data.update.UpdatePreferencesStore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import kotlinx.coroutines.CancellationException
@@ -43,7 +45,8 @@ sealed interface UiState<out T> {
 class PharmacyViewModel(
     private val repository: PharmacyDataSource,
     private val currentUserId: String,
-    private val updatePreferencesStore: UpdatePreferencesStore? = null
+    private val updatePreferencesStore: UpdatePreferencesReader? = null,
+    private val releaseLookup: ReleaseLookup = GitHubReleaseChecker
 ) : ViewModel() {
 
     private val _actionMessage = MutableStateFlow<String?>(null)
@@ -113,7 +116,7 @@ class PharmacyViewModel(
             }
             _appUpdateState.value = AppUpdateState.Checking
             val dismissedTag = store.dismissedTagFlow.first()
-            GitHubReleaseChecker.fetchLatestRelease(
+            releaseLookup.fetchLatestRelease(
                 repoSlug = targetRepo,
                 installedVersionName = BuildConfig.VERSION_NAME,
                 installedVersionCode = BuildConfig.VERSION_CODE
