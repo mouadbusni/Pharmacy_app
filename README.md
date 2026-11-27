@@ -42,6 +42,17 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 9.3.1
+      - name: Restore Firebase google-services.json (optional)
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            if echo "$GOOGLE_SERVICES_JSON" | grep -q '^\s*{'; then
+              printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json
+            else
+              echo "$GOOGLE_SERVICES_JSON" | base64 -d > app/google-services.json
+            fi
+          fi
       - name: Build APK
         env:
           SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
@@ -68,7 +79,7 @@ jobs:
 
 3. **Run & Install on Phone:** Every commit on `main` (or manual run from the **Actions** tab) now builds and attaches an `.apk` under **Releases**, and the app's home screen prompts you to update in one tap.
 
-> **Signing Tip:** Add `SIGNING_KEYSTORE_BASE64`, `STORE_PASSWORD`, and `KEY_PASSWORD` in GitHub Repository Secrets if updating over an existing release-signed demo without uninstalling first.
+> **Secrets Tip:** Add `GOOGLE_SERVICES_JSON` (your `app/google-services.json` contents) in GitHub Repository Secrets for full Google Sign-In and Firestore sync in CI builds, and add `SIGNING_KEYSTORE_BASE64`, `STORE_PASSWORD`, and `KEY_PASSWORD` if signing release APKs with your upload keystore.
 
 ---
 

@@ -81,6 +81,7 @@ import com.example.ui.theme.SaydaliyatiTheme
 import com.example.viewmodel.PharmacyViewModel
 import com.example.viewmodel.UiState
 import com.google.firebase.Firebase
+import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -119,17 +120,25 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun AppContent(auth: FirebaseAuth = Firebase.auth) {
-    var currentUser by remember { mutableStateOf(auth.currentUser) }
+fun AppContent(auth: FirebaseAuth? = null) {
+    val context = LocalContext.current
+    val firebaseAuth = remember(auth, context) {
+        auth ?: if (FirebaseApp.getApps(context).isNotEmpty()) Firebase.auth else null
+    }
+    var currentUser by remember { mutableStateOf(firebaseAuth?.currentUser) }
     var showLoginFromSplash by remember { mutableStateOf(false) }
-    var isAdminBypass by remember { mutableStateOf(false) }
+    var isAdminBypass by remember { mutableStateOf(firebaseAuth == null) }
 
-    DisposableEffect(auth) {
-        val listener = FirebaseAuth.AuthStateListener { firebaseAuth ->
-            currentUser = firebaseAuth.currentUser
+    DisposableEffect(firebaseAuth) {
+        if (firebaseAuth == null) {
+            onDispose { }
+        } else {
+            val listener = FirebaseAuth.AuthStateListener { nextAuth ->
+                currentUser = nextAuth.currentUser
+            }
+            firebaseAuth.addAuthStateListener(listener)
+            onDispose { firebaseAuth.removeAuthStateListener(listener) }
         }
-        auth.addAuthStateListener(listener)
-        onDispose { auth.removeAuthStateListener(listener) }
     }
 
     val user = currentUser
@@ -148,7 +157,7 @@ fun AppContent(auth: FirebaseAuth = Firebase.auth) {
                 LoginScreen(
                     onBack = { showLoginFromSplash = false },
                     onAuthSuccess = {
-                        currentUser = Firebase.auth.currentUser
+                        currentUser = firebaseAuth?.currentUser
                     },
                     onAdminSkipSignIn = { isAdminBypass = true }
                 )
