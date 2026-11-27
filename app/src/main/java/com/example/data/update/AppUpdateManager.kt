@@ -27,8 +27,14 @@ sealed interface AppUpdateState {
     data object Idle : AppUpdateState
     data object Checking : AppUpdateState
     data class UpToDate(val currentVersion: String) : AppUpdateState
+    data class NoReleasesYet(val repoSlug: String) : AppUpdateState
     data class UpdateAvailable(val info: AppUpdateInfo, val isDismissed: Boolean) : AppUpdateState
     data class Error(val message: String) : AppUpdateState
+}
+
+sealed interface ReleaseCheckOutcome {
+    data class Found(val info: AppUpdateInfo, val isNewer: Boolean) : ReleaseCheckOutcome
+    data class NoReleasesYet(val repoSlug: String) : ReleaseCheckOutcome
 }
 
 class UpdatePreferencesStore(private val context: Context) {
@@ -83,7 +89,7 @@ object GitHubReleaseChecker {
         repoSlug: String,
         installedVersionName: String,
         installedVersionCode: Int
-    ): Result<Pair<AppUpdateInfo, Boolean>> = withContext(Dispatchers.IO) {
+    ): Result<ReleaseCheckOutcome> = withContext(Dispatchers.IO) {
         runCatching {
             val normalized = UpdatePreferencesStore.normalizeRepoSlug(repoSlug)
             require(UpdatePreferencesStore.isValidRepoSlug(normalized)) {
@@ -102,7 +108,11 @@ object GitHubReleaseChecker {
             try {
                 val status = conn.responseCode
                 if (status == HttpURLConnection.HTTP_NOT_FOUND) {
-                    throw IllegalStateException("No published GitHub Release found yet for $normalized")
+                    if (isRepoAccessible(normalized)) {
+                        return@runCatching ReleaseCheckOutcome.NoReleasesYet(normalized)
+                    } else {
+                        throw IllegalStateException("Repository $normalized not found or is private")
+                    }
                 }
                 if (status !in 200..299) {
                     throw IllegalStateException("GitHub API returned HTTP $status")
@@ -147,11 +157,46 @@ object GitHubReleaseChecker {
                     installedVersionName = installedVersionName,
                     installedVersionCode = installedVersionCode
                 )
-                info to isNewer
+                ReleaseCheckOutcome.Found(info = info, isNewer = isNewer)
             } finally {
                 conn.disconnect()
             }
         }
+    }
+
+    private fun isRepoAccessible(normalizedSlug: String): Boolean {
+        val repoConn = (URL("https://api.github.com/repos/$normalizedSlug").openConnection() as HttpURLConnection).apply {
+            requestMethod = "GET"
+            connectTimeout = 6000
+            readTimeout = 6000
+            setRequestProperty("Accept", "application/vnd.github+json")
+            setRequestProperty("User-Agent", "Saydaliyati-Android-Updater")
+        }
+        return try {
+            repoConn.responseCode in 200..299
+        } catch (_: Exception) {
+            false
+        } finally {
+            repoConn.disconnect()
+        }
+    }
+
+    fun newWorkflowUrl(repoSlug: String): String {
+        val normalized = UpdatePreferencesStore.normalizeRepoSlug(repoSlug)
+            .ifBlank { UpdatePreferencesStore.DEFAULT_REPO_SLUG }
+        return "https://github.com/$normalized/new/main?filename=.github/workflows/release-apk.yml"
+    }
+
+    fun pullRequestsUrl(repoSlug: String): String {
+        val normalized = UpdatePreferencesStore.normalizeRepoSlug(repoSlug)
+            .ifBlank { UpdatePreferencesStore.DEFAULT_REPO_SLUG }
+        return "https://github.com/$normalized/pulls"
+    }
+
+    fun releasesUrl(repoSlug: String): String {
+        val normalized = UpdatePreferencesStore.normalizeRepoSlug(repoSlug)
+            .ifBlank { UpdatePreferencesStore.DEFAULT_REPO_SLUG }
+        return "https://github.com/$normalized/releases"
     }
 
     internal fun extractBuildCode(tagName: String): Int? {

@@ -15,6 +15,7 @@ import com.example.data.model.UserProfile
 import com.example.data.repository.PharmacyDataSource
 import com.example.data.update.AppUpdateState
 import com.example.data.update.GitHubReleaseChecker
+import com.example.data.update.ReleaseCheckOutcome
 import com.example.data.update.UpdatePreferencesStore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import kotlinx.coroutines.CancellationException
@@ -116,14 +117,22 @@ class PharmacyViewModel(
                 repoSlug = targetRepo,
                 installedVersionName = BuildConfig.VERSION_NAME,
                 installedVersionCode = BuildConfig.VERSION_CODE
-            ).onSuccess { (info, isNewer) ->
-                _appUpdateState.value = if (isNewer) {
-                    AppUpdateState.UpdateAvailable(
-                        info = info,
-                        isDismissed = !manual && dismissedTag == info.tagName
-                    )
-                } else {
-                    AppUpdateState.UpToDate("v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
+            ).onSuccess { outcome ->
+                _appUpdateState.value = when (outcome) {
+                    is ReleaseCheckOutcome.NoReleasesYet -> {
+                        if (manual) AppUpdateState.NoReleasesYet(outcome.repoSlug)
+                        else AppUpdateState.Idle
+                    }
+                    is ReleaseCheckOutcome.Found -> {
+                        if (outcome.isNewer) {
+                            AppUpdateState.UpdateAvailable(
+                                info = outcome.info,
+                                isDismissed = !manual && dismissedTag == outcome.info.tagName
+                            )
+                        } else {
+                            AppUpdateState.UpToDate("v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
+                        }
+                    }
                 }
             }.onFailure { err ->
                 if (manual) {

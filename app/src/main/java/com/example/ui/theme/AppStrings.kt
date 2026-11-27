@@ -186,7 +186,11 @@ data class AppStrings(
     val copyWorkflowYaml: String,
     val workflowCopiedToast: String,
     val signingNoteTitle: String,
-    val signingNoteBody: String
+    val signingNoteBody: String,
+    val noReleasesYetTitle: String,
+    val noReleasesYetBody: String,
+    val openPullRequests: String,
+    val copyAndOpenWorkflow: String
 ) {
     fun formatPrice(amount: Double): String = "${amount.toInt()} $currencySymbol"
 }
@@ -368,7 +372,11 @@ val ArabicStrings = AppStrings(
     copyWorkflowYaml = "نسخ ملف GitHub Action YAML",
     workflowCopiedToast = "تم نسخ ملف الإعداد — ألصقه في .github/workflows/release-apk.yml على GitHub",
     signingNoteTitle = "ملاحظة التوقيع (Release Keystore)",
-    signingNoteBody = "أضف هذا الملف داخل .github/workflows/ في GitHub مباشرة مع أسرار التوقيع (SIGNING_KEYSTORE_BASE64, STORE_PASSWORD, KEY_PASSWORD) ليقبل هاتفك التحديث فوق النسخة الحالية بدون حذفها."
+    signingNoteBody = "أضف هذا الملف داخل .github/workflows/ في GitHub مباشرة مع أسرار التوقيع (SIGNING_KEYSTORE_BASE64, STORE_PASSWORD, KEY_PASSWORD) ليقبل هاتفك التحديث فوق النسخة الحالية بدون حذفها.",
+    noReleasesYetTitle = "لم يُنشر أي إصدار APK بعد",
+    noReleasesYetBody = "١) ادمج طلب السحب المفتوح (Pull Request) إلى main، ثم ٢) انسخ ملف البناء وأنشئه داخل GitHub ليتم نشر أول APK تلقائياً.",
+    openPullRequests = "فتح طلبات السحب (PRs)",
+    copyAndOpenWorkflow = "نسخ وإنشاء Workflow على GitHub"
 )
 
 val EnglishStrings = AppStrings(
@@ -548,7 +556,11 @@ val EnglishStrings = AppStrings(
     copyWorkflowYaml = "Copy GitHub Action YAML",
     workflowCopiedToast = "Workflow YAML copied — paste into .github/workflows/release-apk.yml on GitHub",
     signingNoteTitle = "Release Signing Note",
-    signingNoteBody = "Add the copied workflow directly on GitHub under .github/workflows/ along with your release keystore secrets (SIGNING_KEYSTORE_BASE64, STORE_PASSWORD, KEY_PASSWORD) so updates install directly over your current demo."
+    signingNoteBody = "Add the copied workflow directly on GitHub under .github/workflows/ along with your release keystore secrets (SIGNING_KEYSTORE_BASE64, STORE_PASSWORD, KEY_PASSWORD) so updates install directly over your current demo.",
+    noReleasesYetTitle = "No APK Release Published Yet",
+    noReleasesYetBody = "1) Merge any open Pull Request into main, then 2) copy and paste the workflow file on GitHub to publish your first APK automatically.",
+    openPullRequests = "Open Pull Requests",
+    copyAndOpenWorkflow = "Copy & Create Workflow on GitHub"
 )
 
 val LocalAppStrings = staticCompositionLocalOf { ArabicStrings }

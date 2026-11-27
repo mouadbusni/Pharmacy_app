@@ -4,25 +4,71 @@
 
 ---
 
-## Download APK
+## Download APK & Automated Releases
 
-Download the latest Android APK from **[GitHub Releases](https://github.com/mouadbusni/Pharmacy_app/releases/latest)** (binary APKs are distributed via GitHub Releases rather than committed directly to Git history):
+Latest Android `.apk` builds are published through **[GitHub Releases](https://github.com/mouadbusni/Pharmacy_app/releases/latest)**:
 
 - **Releases Page:** [github.com/mouadbusni/Pharmacy_app/releases](https://github.com/mouadbusni/Pharmacy_app/releases)
+- **Open Pull Requests:** [github.com/mouadbusni/Pharmacy_app/pulls](https://github.com/mouadbusni/Pharmacy_app/pulls)
 - **Version:** `1.0` (`versionCode 1`)
 - **Compatibility:** Android 7.0+ (`minSdk 24`, `targetSdk 36`)
 
-### Installing on Your Phone
+### First-Time Repository & APK Setup
 
-1. Open [Releases](https://github.com/mouadbusni/Pharmacy_app/releases/latest) on your Android device and download the attached `.apk` asset.
-2. Open the downloaded `.apk` file and allow installation from your browser if prompted.
-3. Alternatively, build and install locally via ADB over USB:
-   ```bash
-   gradle :app:assembleDebug
-   adb install -r app/build/outputs/apk/debug/app-debug.apk
-   ```
+If `main` or **Releases** does not show the latest APK yet:
 
-> **Note:** If you previously installed a release-signed APK with a different keystore, uninstall the existing package once before installing a debug-signed or differently signed build.
+1. **Merge Open Pull Requests into `main`:** Open [Pull Requests](https://github.com/mouadbusni/Pharmacy_app/pulls) and merge any pending PR so all updated app files land on `main`.
+2. **Add the GitHub Actions Release Workflow:** Create [`.github/workflows/release-apk.yml`](https://github.com/mouadbusni/Pharmacy_app/new/main?filename=.github/workflows/release-apk.yml) directly in GitHub's web editor and paste:
+
+```yaml
+name: Build & Publish APK
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 9.3.1
+      - name: Build APK
+        env:
+          SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ -n "$SIGNING_KEYSTORE_BASE64" ]; then
+            echo "$SIGNING_KEYSTORE_BASE64" | base64 -d > my-upload-key.jks
+            export KEYSTORE_PATH="${{ github.workspace }}/my-upload-key.jks"
+            gradle :app:assembleRelease
+            cp app/build/outputs/apk/release/app-release.apk Saydaliyati-v1.0.${{ github.run_number }}.apk
+          else
+            gradle :app:assembleDebug
+            cp app/build/outputs/apk/debug/app-debug.apk Saydaliyati-v1.0.${{ github.run_number }}.apk
+          fi
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: Saydaliyati v1.0.${{ github.run_number }}
+          body: Automated APK build from commit ${{ github.sha }}
+          files: Saydaliyati-v1.0.${{ github.run_number }}.apk
+```
+
+3. **Run & Install on Phone:** Every commit on `main` (or manual run from the **Actions** tab) now builds and attaches an `.apk` under **Releases**, and the app's home screen prompts you to update in one tap.
+
+> **Signing Tip:** Add `SIGNING_KEYSTORE_BASE64`, `STORE_PASSWORD`, and `KEY_PASSWORD` in GitHub Repository Secrets if updating over an existing release-signed demo without uninstalling first.
 
 ---
 
@@ -51,13 +97,12 @@ Download the latest Android APK from **[GitHub Releases](https://github.com/moua
 
 ## Over-the-Air Updates via GitHub Releases
 
-Saydaliyati includes a built-in GitHub Releases update checker so new builds pushed to your repository appear directly on your phone:
+Saydaliyati includes a built-in GitHub Releases update checker configured for `mouadbusni/Pharmacy_app`:
 
 1. Open **Settings** -> **App Updates & GitHub Repo**.
-2. Enter your repository in `owner/repo` format and tap **Save & Check**.
-3. Tap **Copy GitHub Action YAML** and add it to `.github/workflows/release-apk.yml` in your repository on GitHub.
-4. Configure your repository secrets (`SIGNING_KEYSTORE_BASE64`, `STORE_PASSWORD`, and `KEY_PASSWORD`) if signing release APKs with your upload keystore.
-5. Whenever a new tagged GitHub Release with an `.apk` asset is published, the home screen displays an **Update Available** banner with a 1-tap **Update Now** download button.
+2. Confirm your repository (`mouadbusni/Pharmacy_app`) and tap **Save & Check**.
+3. If no release exists yet, tap **Copy & Create Workflow on GitHub** to paste `.github/workflows/release-apk.yml` in one step.
+4. Once a tagged GitHub Release with an `.apk` asset is published, the home screen displays an **Update Available** banner with a 1-tap **Update Now** download button.
 
 ---
 

@@ -746,6 +746,82 @@ fun ProfileScreen(
                                 )
                             }
                         }
+                        is AppUpdateState.NoReleasesYet -> {
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MintSoft,
+                                border = BorderStroke(1.dp, ForestGreen.copy(alpha = 0.35f)),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("updates_no_releases_card")
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(
+                                        text = strings.noReleasesYetTitle,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = ForestGreen,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = strings.noReleasesYetBody,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = TextSecondary
+                                    )
+                                    Button(
+                                        onClick = {
+                                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                            clipboard.setPrimaryClip(
+                                                ClipData.newPlainText(
+                                                    "GitHub Release APK Workflow",
+                                                    GitHubReleaseChecker.GITHUB_WORKFLOW_TEMPLATE
+                                                )
+                                            )
+                                            Toast.makeText(context, strings.workflowCopiedToast, Toast.LENGTH_LONG).show()
+                                            val intent = Intent(
+                                                Intent.ACTION_VIEW,
+                                                Uri.parse(GitHubReleaseChecker.newWorkflowUrl(updateState.repoSlug))
+                                            )
+                                            runCatching { context.startActivity(intent) }
+                                        },
+                                        shape = RoundedCornerShape(10.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = ForestGreen),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .minimumInteractiveComponentSize()
+                                            .testTag("updates_create_workflow_button")
+                                    ) {
+                                        Text(
+                                            text = strings.copyAndOpenWorkflow,
+                                            color = PureWhite,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                    OutlinedButton(
+                                        onClick = {
+                                            val intent = Intent(
+                                                Intent.ACTION_VIEW,
+                                                Uri.parse(GitHubReleaseChecker.pullRequestsUrl(updateState.repoSlug))
+                                            )
+                                            runCatching { context.startActivity(intent) }
+                                        },
+                                        shape = RoundedCornerShape(10.dp),
+                                        border = BorderStroke(1.dp, ForestGreen),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .minimumInteractiveComponentSize()
+                                            .testTag("updates_open_prs_button")
+                                    ) {
+                                        Text(
+                                            text = strings.openPullRequests,
+                                            color = ForestGreen
+                                        )
+                                    }
+                                }
+                            }
+                        }
                         is AppUpdateState.UpdateAvailable -> {
                             Surface(
                                 shape = RoundedCornerShape(12.dp),
