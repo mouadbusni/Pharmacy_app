@@ -19,6 +19,17 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 9.3.1
+      - name: Restore Firebase google-services.json (optional)
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            if echo "$GOOGLE_SERVICES_JSON" | grep -q '^\s*{'; then
+              printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json
+            else
+              echo "$GOOGLE_SERVICES_JSON" | base64 -d > app/google-services.json
+            fi
+          fi
       - name: Build APK
         env:
           SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
