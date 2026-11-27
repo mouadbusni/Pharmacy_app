@@ -29,7 +29,6 @@ import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
@@ -45,7 +44,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.data.catalog.PharmacyCatalog
 import com.example.data.model.PrescriptionFilter
@@ -330,47 +328,15 @@ fun SearchProductsScreen(
 
             if (filteredProducts.isEmpty()) {
                 item {
-                    Surface(
-                        shape = RoundedCornerShape(20.dp),
-                        color = PureWhite,
-                        border = BorderStroke(1.dp, BorderSubtle),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 18.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(24.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Text(
-                                text = strings.noMatchingProducts,
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = TextSecondary,
-                                textAlign = TextAlign.Center
-                            )
-                            OutlinedButton(
-                                onClick = {
-                                    query = ""
-                                    selectedCategoryId = "all"
-                                    selectedPrescriptionFilter = PrescriptionFilter.ALL
-                                },
-                                shape = RoundedCornerShape(12.dp),
-                                border = BorderStroke(1.dp, ForestGreen),
-                                modifier = Modifier
-                                    .minimumInteractiveComponentSize()
-                                    .testTag("products_reset_filters")
-                            ) {
-                                Text(
-                                    text = strings.resetFilters,
-                                    color = ForestGreen,
-                                    style = MaterialTheme.typography.labelLarge
-                                )
-                            }
+                    EmptyFilterStateCard(
+                        message = strings.noMatchingProducts,
+                        resetTestTag = "products_reset_filters",
+                        onResetFilters = {
+                            query = ""
+                            selectedCategoryId = "all"
+                            selectedPrescriptionFilter = PrescriptionFilter.ALL
                         }
-                    }
+                    )
                 }
             } else {
                 items(filteredProducts.chunked(columns)) { rowItems ->

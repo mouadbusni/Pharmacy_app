@@ -57,13 +57,11 @@ import com.example.ui.components.ErrorStateCard
 import com.example.ui.components.LoadingStateCard
 import com.example.ui.components.PharmacyAvatarBadge
 import com.example.ui.theme.BorderSubtle
-import com.example.ui.theme.ChatBubbleGray
 import com.example.ui.theme.ForestGreen
 import com.example.ui.theme.LocalAppStrings
 import com.example.ui.theme.MintSoft
 import com.example.ui.theme.NeutralBackground
 import com.example.ui.theme.PureWhite
-import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 import com.example.viewmodel.UiState
 
@@ -194,29 +192,7 @@ fun LiveChatScreen(
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         items(messages, key = { it.id.ifBlank { "${it.senderType}_${it.text.hashCode()}" } }) { msg ->
-                            val isPharmacy = msg.senderType == "PHARMACY"
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = if (isPharmacy) Arrangement.End else Arrangement.Start
-                            ) {
-                                Surface(
-                                    shape = RoundedCornerShape(
-                                        topStart = 18.dp,
-                                        topEnd = 18.dp,
-                                        bottomStart = if (isPharmacy) 18.dp else 4.dp,
-                                        bottomEnd = if (isPharmacy) 4.dp else 18.dp
-                                    ),
-                                    color = if (isPharmacy) ForestGreen else ChatBubbleGray,
-                                    modifier = Modifier.widthIn(max = 300.dp)
-                                ) {
-                                    Text(
-                                        text = msg.text,
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = if (isPharmacy) PureWhite else TextPrimary,
-                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 11.dp)
-                                    )
-                                }
-                            }
+                            ChatMessageBubble(message = msg)
                         }
                     }
                 }

@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CreditCard
@@ -30,8 +29,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -41,14 +38,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.data.catalog.PharmacyCatalog
 import com.example.data.model.CartItem
 import com.example.ui.components.BackCircleButton
@@ -178,163 +171,27 @@ fun CheckoutScreen(
                 )
 
                 if (selectedMethod != "cash") {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(178.dp)
-                            .clip(RoundedCornerShape(22.dp))
-                            .background(
-                                Brush.linearGradient(
-                                    colors = listOf(
-                                        Color(0xFF0A4738),
-                                        Color(0xFF287D6B),
-                                        Color(0xFF7CAFA4)
-                                    )
-                                )
-                            )
-                            .padding(20.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier.fillMaxSize(),
-                            verticalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Surface(
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = PureWhite.copy(alpha = 0.25f),
-                                    modifier = Modifier.size(width = 38.dp, height = 26.dp)
-                                ) {}
-                                Text(
-                                    text = if (selectedMethod == "visa") "VISA" else "Mastercard",
-                                    color = PureWhite,
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.ExtraBold
-                                )
-                            }
-
-                            Text(
-                                text = "••••  ••••  ••••  ${cardDigits.takeLast(4).padStart(4, '•')}",
-                                color = PureWhite,
-                                fontSize = 19.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 2.sp
-                            )
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    text = holderName.ifBlank { strings.cardHolderDefault },
-                                    color = PureWhite.copy(alpha = 0.92f),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = formattedExpiry.ifBlank { strings.expiryPlaceholder },
-                                    color = PureWhite.copy(alpha = 0.92f),
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
-                            }
-                        }
-                    }
-
-                    OutlinedTextField(
-                        value = holderName,
-                        onValueChange = { holderName = it },
-                        label = { Text(strings.cardHolderLabel) },
-                        placeholder = { Text(strings.cardHolderPlaceholder) },
-                        isError = validationAttempted && !isHolderValid,
-                        supportingText = if (validationAttempted && !isHolderValid) {
-                            { Text(strings.errCardHolder) }
-                        } else null,
-                        singleLine = true,
-                        shape = RoundedCornerShape(14.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = ForestGreen,
-                            unfocusedBorderColor = BorderSubtle
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("checkout_holder_input")
+                    CheckoutCardPreview(
+                        selectedMethod = selectedMethod,
+                        cardDigits = cardDigits,
+                        holderName = holderName,
+                        formattedExpiry = formattedExpiry
                     )
-
-                    OutlinedTextField(
-                        value = formattedCardNumber,
-                        onValueChange = { input ->
-                            cardDigits = input.filter { it.isDigit() }.take(16)
-                        },
-                        label = { Text(strings.cardNumberLabel) },
-                        placeholder = { Text(strings.cardNumberPlaceholder) },
-                        isError = validationAttempted && !isCardValid,
-                        supportingText = if (validationAttempted && !isCardValid) {
-                            { Text(strings.errCardNumber) }
-                        } else null,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true,
-                        shape = RoundedCornerShape(14.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = ForestGreen,
-                            unfocusedBorderColor = BorderSubtle
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("checkout_card_input")
+                    CheckoutCardFields(
+                        holderName = holderName,
+                        onHolderNameChange = { holderName = it },
+                        formattedCardNumber = formattedCardNumber,
+                        onCardDigitsChange = { cardDigits = it },
+                        formattedExpiry = formattedExpiry,
+                        onExpiryDigitsChange = { expiryDigits = it },
+                        cvvDigits = cvvDigits,
+                        onCvvDigitsChange = { cvvDigits = it },
+                        validationAttempted = validationAttempted,
+                        isHolderValid = isHolderValid,
+                        isCardValid = isCardValid,
+                        isExpiryValid = isExpiryValid,
+                        isCvvValid = isCvvValid
                     )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        OutlinedTextField(
-                            value = formattedExpiry,
-                            onValueChange = { input ->
-                                expiryDigits = input.filter { it.isDigit() }.take(4)
-                            },
-                            label = { Text(strings.expiryLabel) },
-                            placeholder = { Text(strings.expiryPlaceholder) },
-                            isError = validationAttempted && !isExpiryValid,
-                            supportingText = if (validationAttempted && !isExpiryValid) {
-                                { Text(strings.errExpiry) }
-                            } else null,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            singleLine = true,
-                            shape = RoundedCornerShape(14.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = ForestGreen,
-                                unfocusedBorderColor = BorderSubtle
-                            ),
-                            modifier = Modifier
-                                .weight(1f)
-                                .testTag("checkout_expiry_input")
-                        )
-                        OutlinedTextField(
-                            value = cvvDigits,
-                            onValueChange = { input ->
-                                cvvDigits = input.filter { it.isDigit() }.take(4)
-                            },
-                            label = { Text(strings.cvvLabel) },
-                            placeholder = { Text(strings.cvvPlaceholder) },
-                            isError = validationAttempted && !isCvvValid,
-                            supportingText = if (validationAttempted && !isCvvValid) {
-                                { Text(strings.errCvv) }
-                            } else null,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            singleLine = true,
-                            shape = RoundedCornerShape(14.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = ForestGreen,
-                                unfocusedBorderColor = BorderSubtle
-                            ),
-                            modifier = Modifier
-                                .weight(0.75f)
-                                .testTag("checkout_cvv_input")
-                        )
-                    }
                 } else {
                     Surface(
                         shape = RoundedCornerShape(18.dp),
